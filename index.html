@@ -534,14 +534,14 @@
                     current.angle = Math.atan2(dy, dx);
                 }
 
-                // Поедание синхронизированной еды
+                // Поедание синхронизированной еды (ИЗМЕНЕНО: Добавлен магнит-бонус +20px)
                 for (let i = foods.length - 1; i >= 0; i--) {
                     let f = foods[i];
                     let fDx = head.x - f.x;
                     let fDy = head.y - f.y;
                     let fDist = Math.sqrt(fDx * fDx + fDy * fDy);
 
-                    if (fDist < maxSegmentRadius + f.radius) {
+                    if (fDist < maxSegmentRadius + f.radius + 20) {
                         socket.emit('eat_food', { id: f.id });
                         foods.splice(i, 1); 
                         score++;
