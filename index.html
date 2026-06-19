@@ -174,7 +174,6 @@
             let snake = [];
             let score = 35; 
             let playerName = "Player";
-            let spawnProtection = 0; // Время неуязвимости в миллисекундах при спавне
             
             let maxSegmentRadius = 14;   
             let normalSpeed = 4;        
@@ -186,7 +185,7 @@
             let boostTimer = 0;         
 
             let foods = [];
-            let particles = []; // Массив под искры взрывов
+            let particles = []; 
 
             let camera = { x: 0, y: 0 };
             let cameraSpeed = 0.08; 
@@ -201,7 +200,6 @@
 
             let otherPlayers = {};
 
-            // СЕТЕВЫЕ СОБЫТИЯ
             socket.on('init_data', (data) => {
                 foods = data.foods;
                 otherPlayers = {};
@@ -296,8 +294,6 @@
                 isPlaying = true;
                 isBoosting = false;
                 boostTimer = 0;
-                spawnProtection = 1500; // Включаем 1.5 секунды иммунитета при спавне
-                resizeCanvas();
                 
                 if(cdInterval) clearInterval(cdInterval);
                 isCooldown = false;
@@ -326,7 +322,7 @@
                     angle: snake[0].angle,
                     score: score,
                     skin: currentSkin,
-                    snake: snake // Отправляем готовый хвост на сервер сразу
+                    snake: snake
                 });
 
                 skillBtn.onclick = activateQuantumShift;
@@ -390,7 +386,6 @@
                 }, 1000);
             }
 
-            // РЕАЛИЗАЦИЯ КРАСИВЫХ ИСКР ПРИ ПОДБИТИИ
             function createExplosion(x, y, color, count = 20) {
                 for (let i = 0; i < count; i++) {
                     let angle = Math.random() * Math.PI * 2;
@@ -423,10 +418,6 @@
             function update(dt) {
                 let head = snake[0];
                 
-                if (spawnProtection > 0) {
-                    spawnProtection -= dt; // Уменьшаем время защиты
-                }
-
                 let canBoost = isBoosting && score > 10;
                 let currentSpeed = canBoost ? boostSpeed : normalSpeed;
 
@@ -467,7 +458,6 @@
                     return;
                 }
 
-                // СБОРКА И ОБНОВЛЕНИЕ ХВОСТОВ ДЛЯ ДРУГИХ ИГРОКОВ И ПРОВЕРКА СТОЛКНОВЕНИЙ (БОЙ!)
                 for (let id in otherPlayers) {
                     let p = otherPlayers[id];
                     if (!p.snake) {
@@ -503,15 +493,13 @@
                         current.angle = Math.atan2(dy, dx);
                     }
 
-                    // ЛОГИКА БИТВЫ: Если наша голова коснулась любого сегмента соперника — мы лопаемся
                     for (let i = 0; i < p.snake.length; i++) {
                         let seg = p.snake[i];
                         let hitDx = head.x - seg.x;
                         let hitDy = head.y - seg.y;
                         let hitDist = Math.sqrt(hitDx * hitDx + hitDy * hitDy);
                         
-                        // Защита от смерти проверяется тут (spawnProtection <= 0)
-                        if (hitDist < maxSegmentRadius + 8 && spawnProtection <= 0) {
+                        if (hitDist < maxSegmentRadius + 8) {
                             createExplosion(head.x, head.y, currentSkin.head[1], 50);
                             gameOver();
                             return;
@@ -519,7 +507,6 @@
                     }
                 }
 
-                // Логика движения своего хвоста
                 for (let i = 1; i < snake.length; i++) {
                     let current = snake[i];
                     let prev = snake[i - 1];
@@ -534,7 +521,6 @@
                     current.angle = Math.atan2(dy, dx);
                 }
 
-                // Поедание синхронизированной еды
                 for (let i = foods.length - 1; i >= 0; i--) {
                     let f = foods[i];
                     let fDx = head.x - f.x;
@@ -551,7 +537,6 @@
                     }
                 }
 
-                // Физика искр (эффектов разлета частиц)
                 for (let i = particles.length - 1; i >= 0; i--) {
                     let p = particles[i];
                     p.x += p.vx * (dt / 16.67);
@@ -592,11 +577,9 @@
 
             function render() {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-
                 ctx.save();
                 ctx.translate(-camera.x, -camera.y);
 
-                // Отрисовка сетки
                 ctx.strokeStyle = '#11161d';
                 ctx.lineWidth = 1;
                 let gridSize = 60;
@@ -607,12 +590,10 @@
                     ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WORLD_WIDTH, y); ctx.stroke();
                 }
 
-                // Красная граница мира
                 ctx.strokeStyle = '#ff0055';
                 ctx.lineWidth = 5;
                 ctx.strokeRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
-                // Рендеринг еды
                 for (let i = 0; i < foods.length; i++) {
                     let f = foods[i];
                     if (f.x < camera.x - 20 || f.x > camera.x + canvas.width + 20 ||
@@ -625,7 +606,6 @@
                     ctx.closePath();
                 }
 
-                // РЕНДЕРИНГ ОППОНЕНТОВ
                 for (let id in otherPlayers) {
                     let p = otherPlayers[id];
                     if (!p.snake || p.snake.length === 0) continue;
@@ -686,7 +666,6 @@
                     }
                 }
 
-                // РЕНДЕРИНГ СВОЕЙ ЗМЕЙКИ
                 for (let i = snake.length - 1; i >= 0; i--) {
                     let seg = snake[i];
                     let r = maxSegmentRadius;
@@ -705,12 +684,8 @@
                         gradient.addColorStop(0.2, currentSkin.head[1]);
                         gradient.addColorStop(1, currentSkin.head[2]);
                         
-                        // Визуальный эффект полупрозрачности во время неуязвимости
-                        if (spawnProtection > 0) {
-                            ctx.globalAlpha = 0.5;
-                        } else {
-                            ctx.shadowBlur = 15; ctx.shadowColor = currentSkin.head[1];
-                        }
+                        ctx.shadowBlur = 15; 
+                        ctx.shadowColor = currentSkin.head[1];
                     } else if (i === snake.length - 1) {
                         gradient.addColorStop(0, currentSkin.tail[0]);
                         gradient.addColorStop(0.2, currentSkin.tail[1]);
@@ -744,13 +719,9 @@
                         ctx.fillStyle = '#66fcf1'; ctx.font = 'bold 14px Segoe UI'; ctx.textAlign = 'center';
                         ctx.shadowColor = '#000000'; ctx.shadowBlur = 4;
                         ctx.fillText(playerName, seg.x, seg.y - r - 8); ctx.shadowBlur = 0;
-                        
-                        // Возвращаем непрозрачность к дефолту
-                        ctx.globalAlpha = 1.0;
                     }
                 }
 
-                // ОТРИСОВКА ЖУЙКИ (ВИЗУАЛЬНЫХ ИСКР) ВНУТРИ КАРТЫ
                 for (let i = 0; i < particles.length; i++) {
                     let p = particles[i];
                     ctx.save();
@@ -765,7 +736,6 @@
 
                 ctx.restore();
 
-                // Радар (Миникарта)
                 let radarSize = 130; let radarPadding = 25;
                 let radarX = canvas.width - radarSize - radarPadding;
                 let radarY = canvas.height - radarSize - radarPadding;
