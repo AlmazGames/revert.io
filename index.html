@@ -111,7 +111,18 @@
 
     <canvas id="game-canvas"></canvas>
 
+    <!-- ПОДКЛЮЧАЕМ КЛИЕНТСКИЙ SOCKET.IO ЧЕРЕЗ CDN -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
     <script>
+        // ИНИЦИАЛИЗАЦИЯ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ
+        // Когда запустишь бэкенд на Railway/Render, замени этот текст на полученную ссылку
+        const socket = io("ССЫЛКА_НА_ТВОЙ_СЕРВЕР_БУДЕТ_ЗДЕСЬ");
+
+        socket.on('connect', () => {
+            console.log('Ура! Мы успешно подключились к серверу мультиплеера. Наш ID:', socket.id);
+        });
+
         const menu = document.getElementById('main-menu');
         const tipsDiv = document.getElementById('tips');
         const playBtn = document.getElementById('play-btn');
@@ -370,6 +381,12 @@
             head.x += Math.cos(head.angle) * currentSpeed;
             head.y += Math.sin(head.angle) * currentSpeed;
 
+            // ОТПРАВКА НАШИХ КООРДИНАТ НА СЕРВЕР 
+            // Раскомментируй эти строки ниже, когда запустишь серверную часть в облаке:
+            // if (socket.connected) {
+            //     socket.emit('move', { x: head.x, y: head.y });
+            // }
+
             if (head.x < 0 || head.x > WORLD_WIDTH || head.y < 0 || head.y > WORLD_HEIGHT) {
                 gameOver();
                 return;
@@ -407,7 +424,7 @@
             }
 
             let targetCamX = head.x - canvas.width / 2;
-            let targetCamY = head.y - canvas.height / 2;
+            let targetCamY = head.y - camera.y;
 
             camera.x += (targetCamX - camera.x) * cameraSpeed;
             camera.y += (targetCamY - camera.y) * cameraSpeed;
@@ -422,7 +439,6 @@
             allPlayers.forEach((p, index) => {
                 let item = document.createElement('div');
                 item.className = 'leader-item player';
-                // УБРАНО НАЗВАНИЕ ТЕМЫ В СКОБКАХ: теперь только имя и счет
                 item.innerHTML = `<span>${index + 1}. ${p.name}</span><span>${p.score}</span>`;
                 leaderList.appendChild(item);
             });
@@ -464,7 +480,6 @@
                 let seg = snake[i];
                 
                 let r = maxSegmentRadius;
-                // ИСПРАВЛЕННОЕ СУЖЕНИЕ ХВОСТА: начинается на последних 25% и падает максимум на 15%
                 if (i > snake.length * 0.75) {
                     let factor = (i - snake.length * 0.75) / (snake.length * 0.25);
                     r = maxSegmentRadius * (1 - factor * 0.15); 
@@ -488,7 +503,7 @@
                     gradient.addColorStop(0, currentSkin.tail[0]);
                     gradient.addColorStop(0.2, currentSkin.tail[1]);
                     gradient.addColorStop(1, currentSkin.tail[2]);
-                    ctx.shadowBlur = 0; // БЕЗ СВЕЧЕНИЯ НА САМОМ ХВОСТЕ
+                    ctx.shadowBlur = 0; 
                 } else {
                     gradient.addColorStop(0, currentSkin.body[0]);
                     gradient.addColorStop(0.3, currentSkin.body[1]);
