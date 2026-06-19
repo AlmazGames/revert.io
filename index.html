@@ -116,8 +116,7 @@
 
     <script>
         // ИНИЦИАЛИЗАЦИЯ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ
-        // Когда запустишь бэкенд на Railway/Render, замени этот текст на полученную ссылку
-        const socket = io("ССЫЛКА_НА_ТВОЙ_СЕРВЕР_БУДЕТ_ЗДЕСЬ");
+        const socket = io("https://revert-io-server.onrender.com");
 
         socket.on('connect', () => {
             console.log('Ура! Мы успешно подключились к серверу мультиплеера. Наш ID:', socket.id);
@@ -381,11 +380,10 @@
             head.x += Math.cos(head.angle) * currentSpeed;
             head.y += Math.sin(head.angle) * currentSpeed;
 
-            // ОТПРАВКА НАШИХ КООРДИНАТ НА СЕРВЕР 
-            // Раскомментируй эти строки ниже, когда запустишь серверную часть в облаке:
-            // if (socket.connected) {
-            //     socket.emit('move', { x: head.x, y: head.y });
-            // }
+// ОТПРАВКА НАШИХ КООРДИНАТ НА СЕРВЕР 
+if (socket.connected) {
+    socket.emit('move', { x: head.x, y: head.y });
+}
 
             if (head.x < 0 || head.x > WORLD_WIDTH || head.y < 0 || head.y > WORLD_HEIGHT) {
                 gameOver();
