@@ -111,16 +111,10 @@
 
     <canvas id="game-canvas"></canvas>
 
-    <!-- ПОДКЛЮЧАЕМ КЛИЕНТСКИЙ SOCKET.IO ЧЕРЕЗ CDN -->
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 
     <script>
-        // ИНИЦИАЛИЗАЦИЯ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ
         const socket = io("https://revert-io-server.onrender.com");
-
-        socket.on('connect', () => {
-            console.log('Ура! Мы успешно подключились к серверу мультиплеера. Наш ID:', socket.id);
-        });
 
         const menu = document.getElementById('main-menu');
         const tipsDiv = document.getElementById('tips');
@@ -157,7 +151,6 @@
         const WORLD_WIDTH = 4000;
         const WORLD_HEIGHT = 4000;
 
-        // БАЗА ДАННЫХ ДЛЯ РАНДОМНЫХ СКИНОВ (12 штук)
         const SKINS = [
             { name: "Кибер-Циан", head: ["#ffffff", "#66fcf1", "#1f9c94"], body: ["#a6fff6", "#45a29e", "#1f2833"], tail: ["#ffffff", "#ff0055", "#990033"] },
             { name: "Вулканическая Лава", head: ["#ffffff", "#ff4500", "#8b0000"], body: ["#ffa07a", "#d2691e", "#3a1200"], tail: ["#ffffff", "#ffcc00", "#8b6508"] },
@@ -201,6 +194,38 @@
         let cdDuration = 40; 
         let cdRemaining = 0;
         let cdInterval;
+
+        // ДАННЫЕ О ДРУГИХ ИГРОКАХ
+        let otherPlayers = {};
+
+        // ОБРАБОТЧИКИ СОБЫТИЙ СЕТИ
+        socket.on('current_players', (serverPlayers) => {
+            otherPlayers = {};
+            for (let id in serverPlayers) {
+                if (id !== socket.id) {
+                    otherPlayers[id] = serverPlayers[id];
+                }
+            }
+        });
+
+        socket.on('new_player', (newPlayer) => {
+            otherPlayers[newPlayer.id] = newPlayer;
+        });
+
+        socket.on('player_moved', (movedPlayer) => {
+            if (otherPlayers[movedPlayer.id]) {
+                otherPlayers[movedPlayer.id].x = movedPlayer.x;
+                otherPlayers[movedPlayer.id].y = movedPlayer.y;
+                otherPlayers[movedPlayer.id].angle = movedPlayer.angle;
+                otherPlayers[movedPlayer.id].score = movedPlayer.score;
+            } else {
+                otherPlayers[movedPlayer.id] = movedPlayer;
+            }
+        });
+
+        socket.on('player_disconnected', (id) => {
+            delete otherPlayers[id];
+        });
 
         window.addEventListener('mousemove', (e) => {
             mouse.x = e.clientX;
@@ -256,8 +281,8 @@
 
             snake = [];
             score = 35;
-            let startX = WORLD_WIDTH / 2;
-            let startY = WORLD_HEIGHT / 2;
+            let startX = WORLD_WIDTH / 2 + (Math.random() * 400 - 200);
+            let startY = WORLD_HEIGHT / 2 + (Math.random() * 400 - 200);
             
             for(let i = 0; i < score; i++) {
                 snake.push({ x: startX, y: startY + (i * targetDist), angle: -Math.PI/2 });
@@ -272,6 +297,16 @@
             foods = [];
             spawnFood(MAX_FOOD);
 
+            // Сообщаем серверу, что мы вошли в игру
+            socket.emit('init_player', {
+                name: playerName,
+                x: snake[0].x,
+                y: snake[0].y,
+                angle: snake[0].angle,
+                score: score,
+                skin: currentSkin
+            });
+
             skillBtn.onclick = activateQuantumShift;
             lastTime = performance.now();
             requestAnimationFrame(gameLoop);
@@ -281,6 +316,10 @@
             isPlaying = false;
             isBoosting = false;
             
+            // Оповещаем сервер о смерти, чтобы убрать змейку у других
+            socket.emit('player_died');
+            otherPlayers = {};
+
             canvas.style.display = 'none';
             uiLayer.style.display = 'none';
             massCounterUI.style.display = 'none';
@@ -380,10 +419,10 @@
             head.x += Math.cos(head.angle) * currentSpeed;
             head.y += Math.sin(head.angle) * currentSpeed;
 
-// ОТПРАВКА НАШИХ КООРДИНАТ НА СЕРВЕР 
-if (socket.connected) {
-    socket.emit('move', { x: head.x, y: head.y });
-}
+            // ОТПРАВКА НАШИХ НАСТОЯЩИХ КООРДИНАТ, УГЛА И СЧЕТА
+            if (socket.connected) {
+                socket.emit('move', { x: head.x, y: head.y, angle: head.angle, score: score });
+            }
 
             if (head.x < 0 || head.x > WORLD_WIDTH || head.y < 0 || head.y > WORLD_HEIGHT) {
                 gameOver();
@@ -404,6 +443,43 @@ if (socket.connected) {
                 current.angle = Math.atan2(dy, dx);
             }
 
+            // РАСЧЕТ И ДВИЖЕНИЕ ХВОСТОВ ЧУЖИХ ЗМЕЕК (Локальная симуляция плавности)
+            for (let id in otherPlayers) {
+                let p = otherPlayers[id];
+                if (!p.snake) {
+                    p.snake = [];
+                    for (let i = 0; i < p.score; i++) {
+                        p.snake.push({ x: p.x, y: p.y, angle: p.angle || 0 });
+                    }
+                }
+
+                let rHead = p.snake[0];
+                rHead.x = p.x;
+                rHead.y = p.y;
+                rHead.angle = p.angle || 0;
+
+                while (p.snake.length < p.score) {
+                    let last = p.snake[p.snake.length - 1] || rHead;
+                    p.snake.push({ x: last.x, y: last.y, angle: last.angle });
+                }
+                while (p.snake.length > p.score) {
+                    p.snake.pop();
+                }
+
+                for (let i = 1; i < p.snake.length; i++) {
+                    let current = p.snake[i];
+                    let prev = p.snake[i - 1];
+                    let dx = prev.x - current.x;
+                    let dy = prev.y - current.y;
+                    let dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist > 0) {
+                        current.x = prev.x - (dx / dist) * targetDist;
+                        current.y = prev.y - (dy / dist) * targetDist;
+                    }
+                    current.angle = Math.atan2(dy, dx);
+                }
+            }
+
             for (let i = foods.length - 1; i >= 0; i--) {
                 let f = foods[i];
                 let fDx = head.x - f.x;
@@ -422,7 +498,7 @@ if (socket.connected) {
             }
 
             let targetCamX = head.x - canvas.width / 2;
-            let targetCamY = head.y - camera.y;
+            let targetCamY = head.y - canvas.height / 2;
 
             camera.x += (targetCamX - camera.x) * cameraSpeed;
             camera.y += (targetCamY - camera.y) * cameraSpeed;
@@ -432,11 +508,21 @@ if (socket.connected) {
         }
 
         function updateLeaderboard() {
-            let allPlayers = [{ name: playerName, score: score }];
+            let allPlayers = [];
+            if (isPlaying) {
+                allPlayers.push({ name: playerName, score: score, isMe: true });
+            }
+            for (let id in otherPlayers) {
+                allPlayers.push({ name: otherPlayers[id].name, score: otherPlayers[id].score, isMe: false });
+            }
+
+            // Сортируем всех игроков по убыванию очков
+            allPlayers.sort((a, b) => b.score - a.score);
+
             leaderList.innerHTML = "";
-            allPlayers.forEach((p, index) => {
+            allPlayers.slice(0, 10).forEach((p, index) => {
                 let item = document.createElement('div');
-                item.className = 'leader-item player';
+                item.className = p.isMe ? 'leader-item player' : 'leader-item';
                 item.innerHTML = `<span>${index + 1}. ${p.name}</span><span>${p.score}</span>`;
                 leaderList.appendChild(item);
             });
@@ -474,6 +560,87 @@ if (socket.connected) {
                 ctx.closePath();
             }
 
+            // РЕНДЕР ДРУГИХ ЗМЕЕК НА КАРТЕ
+            for (let id in otherPlayers) {
+                let p = otherPlayers[id];
+                if (!p.snake || p.snake.length === 0) continue;
+
+                for (let i = p.snake.length - 1; i >= 0; i--) {
+                    let seg = p.snake[i];
+                    let r = maxSegmentRadius;
+                    if (i > p.snake.length * 0.75) {
+                        let factor = (i - p.snake.length * 0.75) / (p.snake.length * 0.25);
+                        r = maxSegmentRadius * (1 - factor * 0.15); 
+                    }
+
+                    ctx.beginPath();
+                    ctx.arc(seg.x, seg.y, r, 0, Math.PI * 2);
+
+                    let gradient = ctx.createRadialGradient(
+                        seg.x - r * 0.3, seg.y - r * 0.3, r * 0.1, 
+                        seg.x, seg.y, r                           
+                    );
+
+                    let skin = p.skin || SKINS[0];
+                    if (i === 0) {
+                        gradient.addColorStop(0, skin.head[0]);
+                        gradient.addColorStop(0.2, skin.head[1]);
+                        gradient.addColorStop(1, skin.head[2]);
+                        ctx.shadowBlur = 15;
+                        ctx.shadowColor = skin.head[1];
+                    } else if (i === p.snake.length - 1) {
+                        gradient.addColorStop(0, skin.tail[0]);
+                        gradient.addColorStop(0.2, skin.tail[1]);
+                        gradient.addColorStop(1, skin.tail[2]);
+                        ctx.shadowBlur = 0;
+                    } else {
+                        gradient.addColorStop(0, skin.body[0]);
+                        gradient.addColorStop(0.3, skin.body[1]);
+                        gradient.addColorStop(1, skin.body[2]);
+                        ctx.shadowBlur = 0;
+                    }
+
+                    ctx.fillStyle = gradient;
+                    ctx.fill();
+                    ctx.closePath();
+                    ctx.shadowBlur = 0;
+
+                    if (i === 0) {
+                        let headAngle = seg.angle;
+                        let eyeDist = r * 0.5;       
+                        let eyeRadius = r * 0.35;    
+                        let pupilRadius = r * 0.18;  
+                        let eyeAngleOffset = 0.6;    
+
+                        let leftEyeX = seg.x + Math.cos(headAngle - eyeAngleOffset) * eyeDist;
+                        let leftEyeY = seg.y + Math.sin(headAngle - eyeAngleOffset) * eyeDist;
+                        let rightEyeX = seg.x + Math.cos(headAngle + eyeAngleOffset) * eyeDist;
+                        let rightEyeY = seg.y + Math.sin(headAngle + eyeAngleOffset) * eyeDist;
+
+                        ctx.fillStyle = '#ffffff';
+                        ctx.beginPath(); ctx.arc(leftEyeX, leftEyeY, eyeRadius, 0, Math.PI * 2); ctx.fill(); ctx.closePath();
+                        ctx.beginPath(); ctx.arc(rightEyeX, rightEyeY, eyeRadius, 0, Math.PI * 2); ctx.fill(); ctx.closePath();
+
+                        let lookX = Math.cos(headAngle) * 2;
+                        let lookY = Math.sin(headAngle) * 2;
+
+                        ctx.fillStyle = '#000000';
+                        ctx.beginPath(); ctx.arc(leftEyeX + lookX, leftEyeY + lookY, pupilRadius, 0, Math.PI * 2); ctx.fill(); ctx.closePath();
+                        ctx.beginPath(); ctx.arc(rightEyeX + lookX, rightEyeY + lookY, pupilRadius, 0, Math.PI * 2); ctx.fill(); ctx.closePath();
+
+                        // Рендерим чужой Никнейм над головой
+                        ctx.fillStyle = '#ffffff';
+                        ctx.font = 'bold 14px Segoe UI';
+                        ctx.textAlign = 'center';
+                        ctx.shadowColor = '#000000';
+                        ctx.shadowBlur = 4;
+                        ctx.fillText(p.name, seg.x, seg.y - r - 8);
+                        ctx.shadowBlur = 0;
+                    }
+                }
+            }
+
+            // РЕНДЕР НАШЕЙ СОБСТВЕННОЙ ЗМЕЕК
             for (let i = snake.length - 1; i >= 0; i--) {
                 let seg = snake[i];
                 
@@ -536,11 +703,21 @@ if (socket.connected) {
                     ctx.fillStyle = '#000000';
                     ctx.beginPath(); ctx.arc(leftEyeX + lookX, leftEyeY + lookY, pupilRadius, 0, Math.PI * 2); ctx.fill(); ctx.closePath();
                     ctx.beginPath(); ctx.arc(rightEyeX + lookX, rightEyeY + lookY, pupilRadius, 0, Math.PI * 2); ctx.fill(); ctx.closePath();
+
+                    // Наш Никнейм над нашей головой
+                    ctx.fillStyle = '#66fcf1';
+                    ctx.font = 'bold 14px Segoe UI';
+                    ctx.textAlign = 'center';
+                    ctx.shadowColor = '#000000';
+                    ctx.shadowBlur = 4;
+                    ctx.fillText(playerName, seg.x, seg.y - r - 8);
+                    ctx.shadowBlur = 0;
                 }
             }
 
             ctx.restore();
 
+            // РАДАР (МИНИ-КАРТА)
             let radarSize = 130;
             let radarPadding = 25;
             let radarX = canvas.width - radarSize - radarPadding;
@@ -559,6 +736,17 @@ if (socket.connected) {
             ctx.moveTo(radarX, radarY + radarSize / 2); ctx.lineTo(radarX + radarSize, radarY + radarSize / 2);
             ctx.stroke();
 
+            // Отображаем чужие точки на радаре
+            for (let id in otherPlayers) {
+                let op = otherPlayers[id];
+                let opRadarX = radarX + (op.x / WORLD_WIDTH) * radarSize;
+                let opRadarY = radarY + (op.y / WORLD_HEIGHT) * radarSize;
+                let opSkin = op.skin || SKINS[0];
+                ctx.fillStyle = opSkin.head[1]; 
+                ctx.beginPath(); ctx.arc(opRadarX, opRadarY, 3.5, 0, Math.PI * 2); ctx.fill(); ctx.closePath();
+            }
+
+            // Наша точка на радаре
             let head = snake[0];
             let playerRadarX = radarX + (head.x / WORLD_WIDTH) * radarSize;
             let playerRadarY = radarY + (head.y / WORLD_HEIGHT) * radarSize;
