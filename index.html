@@ -3,11 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Revert.io (Оффлайн и Онлайн)</title>
+    <title>Revert.io</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; touch-action: none; }
         body, html { width: 100%; height: 100%; overflow: hidden; background-color: #0b0c10; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        
+
+        /* ГЛАВНОЕ МЕНЮ */
         #main-menu {
             position: absolute; width: 100%; height: 100%; z-index: 10;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -19,11 +20,10 @@
             text-shadow: 0 0 10px #66fcf1, 0 0 30px #45a29e;
             letter-spacing: 5px; margin-bottom: 10px;
         }
-        @media (max-width: 768px) { .title { font-size: 48px; } }
-        
         #tips {
-            font-size: 18px; color: #c5a059; height: 30px; margin-bottom: 40px; text-align: center; padding: 0 10px;
-            text-shadow: 0 0 5px rgba(197, 160, 89, 0.5); transition: opacity 0.5s ease; opacity: 0;
+            font-size: 18px; color: #c5a059; height: 30px; margin-bottom: 40px;
+            text-shadow: 0 0 5px rgba(197, 160, 89, 0.5);
+            transition: opacity 0.5s ease; opacity: 0;
         }
         #nickname {
             width: 280px; padding: 15px; font-size: 18px; border: 2px solid #45a29e;
@@ -31,80 +31,55 @@
             text-align: center; outline: none; margin-bottom: 25px; transition: 0.3s;
         }
         #nickname:focus { border-color: #66fcf1; box-shadow: 0 0 15px rgba(102, 252, 241, 0.4); }
-        
-        .menu-btn {
-            width: 280px; padding: 15px; font-size: 20px; font-weight: bold;
-            border: none; border-radius: 8px; cursor: pointer; transition: 0.2s ease-in-out;
-        }
         #play-btn {
-            background: #66fcf1; color: #0b0c10; box-shadow: 0 0 15px #66fcf1; margin-bottom: 15px;
+            width: 280px; padding: 15px; font-size: 22px; font-weight: bold;
+            background: #66fcf1; color: #0b0c10; border: none; border-radius: 8px;
+            cursor: pointer; transition: 0.2s ease-in-out; box-shadow: 0 0 15px #66fcf1;
         }
         #play-btn:hover:not(:disabled) { transform: scale(1.05); background: #fff; box-shadow: 0 0 25px #fff; }
-        
-        #bots-btn {
-            background: #bd00ff; color: #fff; box-shadow: 0 0 15px #bd00ff;
-        }
-        #bots-btn:hover:not(:disabled) { transform: scale(1.05); background: #df80ff; box-shadow: 0 0 25px #df80ff; }
-        
-        .menu-btn:disabled { background: #45a29e; color: #1f2833; cursor: not-allowed; box-shadow: none; opacity: 0.6; }
-        
+        #play-btn:disabled { background: #45a29e; color: #1f2833; cursor: not-allowed; box-shadow: none; opacity: 0.6; }
+
+        /* ИГРОВОЙ ЭКРАН */
         #game-canvas { display: none; width: 100%; height: 100%; background: #0c0f12; }
         
+        /* СЧЕТЧИК МАССЫ */
         #mass-counter {
-            display: none; position: absolute; top: 160px; left: 20px; z-index: 5;
+            display: none; position: absolute; top: 20px; left: 20px; z-index: 5;
             color: #66fcf1; font-size: 24px; font-weight: bold;
             text-shadow: 0 0 10px rgba(102, 252, 241, 0.6);
         }
-        @media (max-width: 768px) { #mass-counter { top: 145px; font-size: 20px; left: 15px; } }
 
-        /* МОБИЛЬНЫЙ ДЖОЙСТИК */
-        #mobile-joystick-zone {
-            display: none; position: absolute; bottom: 40px; left: 40px;
-            width: 140px; height: 140px; background: rgba(31, 40, 51, 0.3);
-            border: 2px solid rgba(102, 252, 241, 0.4); border-radius: 50%; z-index: 6;
-            align-items: center; justify-content: center;
+        /* ИНТЕРФЕЙС СПОСОБНОСТИ [T] ДЛЯ ПК (СНИЗУ СЛЕВА) */
+        #ui-layer {
+            display: none; position: absolute; bottom: 30px; left: 30px; z-index: 5;
+            flex-direction: column; align-items: center;
         }
-        #mobile-joystick-stick {
-            width: 50px; height: 50px; background: #66fcf1;
-            border-radius: 50%; box-shadow: 0 0 15px #66fcf1;
-            position: absolute; pointer-events: none;
+        #shift-skill {
+            width: 70px; height: 70px; border-radius: 50%;
+            background: #1f2833; border: 3px solid #66fcf1;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 32px; color: #66fcf1; font-weight: bold;
+            box-shadow: 0 0 15px rgba(102, 252, 241, 0.3);
+            position: relative; cursor: pointer; transition: 0.2s;
         }
-        
-        /* МОБИЛЬНЫЕ КНОПКИ */
-        #mobile-buttons-zone {
-            display: none; position: absolute; bottom: 40px; right: 40px;
-            gap: 20px; flex-direction: column; align-items: center; z-index: 6;
+        #shift-skill.cooldown {
+            border-color: #ff0055; color: #ff0055; opacity: 0.6; cursor: not-allowed;
+            box-shadow: 0 0 15px rgba(255, 0, 85, 0.2);
         }
-        .mobile-btn {
-            width: 75px; height: 75px; border-radius: 50%;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            font-weight: bold; font-size: 14px; border: 3px solid #66fcf1;
-            box-shadow: 0 0 15px rgba(102, 252, 241, 0.4); transition: 0.1s;
+        #cd-timer {
+            position: absolute; width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(11, 12, 16, 0.8); border-radius: 50%;
+            font-size: 20px; font-weight: bold; color: #ff0055; display: none;
         }
-        #mobile-boost-btn { background: rgba(102, 252, 241, 0.2); color: #66fcf1; }
-        #mobile-boost-btn.active { background: #66fcf1; color: #0b0c10; transform: scale(0.95); box-shadow: 0 0 25px #66fcf1; }
-        
-        #mobile-shift-btn { background: #1f2833; color: #66fcf1; font-size: 28px; position: relative; }
-        #mobile-shift-btn.cooldown { border-color: #ff0055; color: #ff0055; opacity: 0.6; box-shadow: 0 0 15px rgba(255, 0, 85, 0.2); }
-        #mobile-cd-timer {
-            position: absolute; width: 100%; height: 100%; display: flex;
-            align-items: center; justify-content: center; background: rgba(11, 12, 16, 0.85);
-            border-radius: 50%; font-size: 20px; font-weight: bold; color: #ff0055; display: none;
-        }
+        .hotkey-hint { margin-top: 5px; color: #888; font-size: 12px; font-weight: bold; text-shadow: 0 2px 4px #000; }
 
-        .pc-hint { margin-top: 4px; color: #888; font-size: 11px; font-weight: bold; text-shadow: 0 2px 4px #000; }
-        @media (max-width: 768px) { .pc-hint { display: none; } }
-
+        /* ЛИДЕРБОРД */
         #leaderboard {
             display: none; position: absolute; top: 20px; right: 20px; z-index: 5;
             background: rgba(11, 12, 16, 0.75); border: 1px solid #45a29e;
             border-radius: 8px; width: 220px; padding: 15px; color: #fff;
             box-shadow: 0 0 15px rgba(0,0,0,0.5);
-        }
-        @media (max-width: 768px) {
-            #leaderboard { width: 150px; padding: 8px; top: 15px; right: 15px; }
-            #leaderboard h3 { font-size: 13px; margin-bottom: 5px; }
-            .leader-item { font-size: 11px; }
         }
         #leaderboard h3 { color: #66fcf1; font-size: 18px; margin-bottom: 10px; text-align: center; text-transform: uppercase; border-bottom: 1px solid #45a29e; padding-bottom: 5px;}
         .leader-item { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 4px; color: #c5a059; }
@@ -117,8 +92,7 @@
         <h1 class="title">Revert.io</h1>
         <div id="tips">Загрузка подсказок...</div>
         <input type="text" id="nickname" placeholder="Nickname..." maxlength="14" value="Player">
-        <button id="play-btn" class="menu-btn">PLAY MULTIPLAYER</button>
-        <button id="bots-btn" class="menu-btn">PLAY WITH BOTS</button>
+        <button id="play-btn">PLAY</button>
     </div>
 
     <div id="mass-counter">MASS: 35</div>
@@ -128,575 +102,581 @@
         <div id="leader-list"></div>
     </div>
 
-    <div id="mobile-joystick-zone">
-        <div id="mobile-joystick-stick"></div>
-    </div>
-
-    <div id="mobile-buttons-zone">
-        <div id="mobile-shift-btn" class="mobile-btn">
+    <div id="ui-layer">
+        <div id="shift-skill">
             ⇄
-            <div id="mobile-cd-timer">40</div>
-            <div class="pc-hint">[ T ]</div>
+            <div id="cd-timer">40</div>
         </div>
-        <div id="mobile-boost-btn" class="mobile-btn">
-            <span>BOOST</span>
-            <div class="pc-hint">[ SPACE ]</div>
-        </div>
+        <div class="hotkey-hint">КЛАВИША [ T ]</div>
     </div>
 
     <canvas id="game-canvas"></canvas>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
     <script>
         (function() {
-            // Подключение к серверу (для онлайн режима)
-            let socket = null;
-            try {
-                socket = io("https://revert-io-server.onrender.com", { autoConnect: false });
-            } catch(e) { console.log("Оффлайн-режим готов к работе."); }
+            const socket = io("https://revert-io-server.onrender.com");
 
             const menu = document.getElementById('main-menu');
             const tipsDiv = document.getElementById('tips');
             const playBtn = document.getElementById('play-btn');
-            const botsBtn = document.getElementById('bots-btn');
             const canvas = document.getElementById('game-canvas');
+            const uiLayer = document.getElementById('ui-layer');
             const massCounterUI = document.getElementById('mass-counter');
             const leaderboardUI = document.getElementById('leaderboard');
             const leaderList = document.getElementById('leader-list');
+            const skillBtn = document.getElementById('shift-skill');
+            const cdTimerText = document.getElementById('cd-timer');
             const nicknameInput = document.getElementById('nickname');
             const ctx = canvas.getContext('2d');
 
-            const joystickZone = document.getElementById('mobile-joystick-zone');
-            const joystickStick = document.getElementById('mobile-joystick-stick');
-            const mobileButtonsZone = document.getElementById('mobile-buttons-zone');
-            const boostBtn = document.getElementById('mobile-boost-btn');
-            const shiftBtn = document.getElementById('mobile-shift-btn');
-            const cdTimerText = document.getElementById('mobile-cd-timer');
-
             const tips = [
-                "Используй Квантовый Переворот [T], чтобы превратить свой хвост в голову!",
-                "Зажми кнопку BOOST или Пробел для резкого ускорения.",
-                "Осторожно! Красная граница карты смертельно опасна!",
-                "Режим с ботами работает полностью оффлайн без интернета!"
+                "Используй кнопку [T], чтобы превратить свой хвост в голову!",
+                "Зажми Пробел или ЛКМ, чтобы активировать турбо-ускорение.",
+                "Осторожно! Красная граница карты теперь смертельно опасна!",
+                "Собирай светящиеся сферы, чтобы расти и становиться сильнее."
             ];
             let tipIndex = 0;
-            setInterval(() => {
+
+            function updateTips() {
                 tipsDiv.style.opacity = 0;
                 setTimeout(() => {
                     tipsDiv.innerText = tips[tipIndex];
                     tipsDiv.style.opacity = 1;
                     tipIndex = (tipIndex + 1) % tips.length;
                 }, 500);
-            }, 5000);
+            }
+            updateTips();
+            setInterval(updateTips, 5000);
 
-            const WORLD_SIZE = 4000;
-            const maxSegmentRadius = 14;
-            const SEGMENT_SPACING = 9; 
+            const WORLD_WIDTH = 4000;
+            const WORLD_HEIGHT = 4000;
 
             const SKINS = [
                 { name: "Кибер-Циан", head: ["#ffffff", "#66fcf1", "#1f9c94"], body: ["#a6fff6", "#45a29e", "#1f2833"], tail: ["#ffffff", "#ff0055", "#990033"] },
                 { name: "Вулканическая Лава", head: ["#ffffff", "#ff4500", "#8b0000"], body: ["#ffa07a", "#d2691e", "#3a1200"], tail: ["#ffffff", "#ffcc00", "#8b6508"] },
-                { name: "Ядовитый Плющ", head: ["#ffffff", "#00ff00", "#006400"], body: ["#adff2f", "#32cd32", "#0b2000"], tail: ["#ffffff", "#ff00ff", "#8b008b"] }
+                { name: "Ядовитый Плющ", head: ["#ffffff", "#00ff00", "#006400"], body: ["#adff2f", "#32cd32", "#0b2000"], tail: ["#ffffff", "#ff00ff", "#8b008b"] },
+                { name: "Космический Аметист", head: ["#ffffff", "#da70d6", "#4b0082"], body: ["#e6a8f7", "#8a2be2", "#1f0033"], tail: ["#ffffff", "#00ffff", "#008b8b"] },
+                { name: "Чистое Золото", head: ["#ffffff", "#ffd700", "#b8860b"], body: ["#fff0a5", "#daa520", "#2c1d00"], tail: ["#ffffff", "#ffffff", "#a9a9a9"] },
+                { name: "Ледяной Шторм", head: ["#ffffff", "#00ffff", "#008b8b"], body: ["#e0ffff", "#00bfff", "#004080"], tail: ["#ffffff", "#7fffd4", "#45a29e"] },
+                { name: "Рубиновый Закат", head: ["#ffffff", "#ff0055", "#660022"], body: ["#ff6699", "#b3003b", "#330011"], tail: ["#ffffff", "#ffcc00", "#b8860b"] },
+                { name: "Электрик", head: ["#ffffff", "#0022ff", "#000066"], body: ["#6688ff", "#0000b3", "#000022"], tail: ["#ffffff", "#00ffff", "#008b8b"] },
+                { name: "Сакура", head: ["#ffffff", "#ffb7c5", "#943848"], body: ["#ffe4e1", "#ffc0cb", "#4a121a"], tail: ["#ffffff", "#ffffff", "#cccccc"] },
+                { name: "Синтвейв", head: ["#ffffff", "#ff007f", "#4a0025"], body: ["#ff66cc", "#990066", "#240019"], tail: ["#ffffff", "#00ffff", "#006666"] },
+                { name: "Монохром", head: ["#ffffff", "#e0e0e0", "#404040"], body: ["#ffffff", "#808080", "#1a1a1a"], tail: ["#ffffff", "#333333", "#000000"] },
+                { name: "Изумрудный Призрак", head: ["#ffffff", "#50c878", "#0b3f1d"], body: ["#a3ffd6", "#2e8b57", "#051f0e"], tail: ["#ffffff", "#adff2f", "#556b2f"] }
             ];
 
             let currentSkin = SKINS[0]; 
             let isPlaying = false;
-            let isOfflineMode = false; // Флаг режима игры
             let mouse = { x: 0, y: 0 };
-            let targetAngle = 0;
-            let isBoosting = false;
+            let snake = [];
+            let score = 35; 
+            let playerName = "Player";
+            let spawnProtection = 0; 
+            
+            let maxSegmentRadius = 14;   
+            let normalSpeed = 4;        
+            let boostSpeed = 4 * 1.4;   
+            let maxTurnSpeed = 0.08;     
+            let targetDist = 9;          
+
+            let isBoosting = false;     
+            let boostTimer = 0;         
 
             let foods = [];
-            let otherPlayers = {}; // В оффлайн режиме тут будут храниться локальные боты
-            let particles = [];
+            let particles = []; 
+
             let camera = { x: 0, y: 0 };
+            let cameraSpeed = 0.08; 
+
+            let lastTime = 0;
+            let gameLoopId = null;
 
             let isCooldown = false;
             let cdDuration = 40; 
             let cdRemaining = 0;
             let cdInterval;
 
+            let otherPlayers = {};
             let isMobile = false;
-            function checkDevice() { isMobile = ('onTouchStart' in window || navigator.maxTouchPoints > 0 || window.innerWidth <= 768); }
 
-            let joystickActive = false;
-            let joystickCenter = { x: 0, y: 0 };
-            let joystickAngle = 0;
-
-            // СЕТЕВЫЕ СОБЫТИЯ (РАБОТАЮТ ТОЛЬКО В ОНЛАЙНЕ)
-            if (socket) {
-                socket.on('init_data', (data) => { if(!isOfflineMode) { foods = data.foods; otherPlayers = data.players; } });
-                socket.on('spawned', (pData) => {
-                    if(isOfflineMode) return;
-                    isPlaying = true;
-                    camera.x = pData.x - canvas.width / 2;
-                    camera.y = pData.y - canvas.height / 2;
-                });
-                socket.on('new_player', (p) => { if(!isOfflineMode) otherPlayers[p.id] = p; });
-                socket.on('player_disconnected', (id) => { if(!isOfflineMode) delete otherPlayers[id]; });
-                socket.on('food_update', (data) => {
-                    if(isOfflineMode) return;
-                    const idx = foods.findIndex(f => f.id === data.eatenId);
-                    if (idx !== -1) foods.splice(idx, 1);
-                    foods.push(data.newFood);
-                });
-                socket.on('foods_spawned', (newFoods) => { if(!isOfflineMode) foods = foods.concat(newFoods); });
-                socket.on('player_exploded', (data) => { if(!isOfflineMode) createExplosion(data.x, data.y, data.color, 40); });
-                socket.on('player_died_notification', (id) => {
-                    if (isOfflineMode) return;
-                    if (id === socket.id) gameOver(); else delete otherPlayers[id];
-                });
-                socket.on('heartbeat', (serverPlayers) => {
-                    if (isOfflineMode) return;
-                    otherPlayers = serverPlayers;
-                    if (isPlaying && otherPlayers[socket.id]) {
-                        massCounterUI.innerText = `MASS: ${otherPlayers[socket.id].score}`;
-                    }
-                    updateLeaderboard();
-                });
+            // Определение типа устройства
+            function detectDevice() {
+                isMobile = ('ontouchstart' in window || navigator.maxTouchPoints > 0 || window.innerWidth <= 768);
             }
 
-            // УПРАВЛЕНИЕ ПК
-            window.addEventListener('mousemove', (e) => { if(!joystickActive) { mouse.x = e.clientX; mouse.y = e.clientY; updateAngle(); } });
-            window.addEventListener('mousedown', (e) => { if (e.button === 0 && isPlaying && !isMobile) { isBoosting = true; } });
-            window.addEventListener('mouseup', (e) => { if (e.button === 0 && !isMobile) { isBoosting = false; } });
+            socket.on('init_data', (data) => {
+                foods = data.foods;
+                otherPlayers = {};
+                for (let id in data.players) {
+                    if (id !== socket.id) {
+                        otherPlayers[id] = data.players[id];
+                    }
+                }
+            });
+
+            socket.on('new_player', (newPlayer) => {
+                otherPlayers[newPlayer.id] = newPlayer;
+            });
+
+            socket.on('player_moved', (movedPlayer) => {
+                if (otherPlayers[movedPlayer.id]) {
+                    otherPlayers[movedPlayer.id].x = movedPlayer.x;
+                    otherPlayers[movedPlayer.id].y = movedPlayer.y;
+                    otherPlayers[movedPlayer.id].angle = movedPlayer.angle;
+                    otherPlayers[movedPlayer.id].score = movedPlayer.score;
+                } else {
+                    otherPlayers[movedPlayer.id] = movedPlayer;
+                }
+            });
+
+            socket.on('player_disconnected', (id) => {
+                delete otherPlayers[id];
+            });
+
+            socket.on('food_update', (data) => {
+                const idx = foods.findIndex(f => f.id === data.eatenId);
+                if (idx !== -1) foods.splice(idx, 1);
+                foods.push(data.newFood);
+            });
+
+            socket.on('foods_spawned', (newFoods) => {
+                foods = foods.concat(newFoods);
+            });
+
+            socket.on('player_exploded', (data) => {
+                createExplosion(data.x, data.y, data.color, 40);
+            });
+
+            socket.on('player_died_notification', (id) => {
+                if (id === socket.id) {
+                    gameOver();
+                } else {
+                    delete otherPlayers[id];
+                }
+            });
+
+            socket.on('spawned', (pData) => {
+                isPlaying = true;
+                camera.x = pData.x - canvas.width / 2;
+                camera.y = pData.y - canvas.height / 2;
+            });
+
+            socket.on('heartbeat', (serverPlayers) => {
+                for (let id in serverPlayers) {
+                    if (id !== socket.id) {
+                        otherPlayers[id] = serverPlayers[id];
+                    } else {
+                        score = serverPlayers[id].score;
+                        snake = serverPlayers[id].snake;
+                    }
+                }
+                for (let id in otherPlayers) {
+                    if (!serverPlayers[id]) delete otherPlayers[id];
+                }
+                updateLeaderboard();
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                mouse.x = e.clientX;
+                mouse.y = e.clientY;
+            });
+
+            window.addEventListener('mousedown', (e) => {
+                if (e.button === 0 && isPlaying) isBoosting = true;
+            });
+            window.addEventListener('mouseup', (e) => {
+                if (e.button === 0) isBoosting = false;
+            });
+
             window.addEventListener('keydown', (e) => {
                 if (!isPlaying) return;
-                if (e.code === 'Space') { e.preventDefault(); isBoosting = true; }
-                if (e.key.toLowerCase() === 't' || e.key.toLowerCase() === 'е') activateQuantumShift();
-            });
-            window.addEventListener('keyup', (e) => { if (e.code === 'Space') { isBoosting = false; } });
-
-            // МОБИЛЬНЫЙ ДЖОЙСТИК
-            joystickZone.addEventListener('touchstart', (e) => {
-                e.preventDefault(); joystickActive = true;
-                const rect = joystickZone.getBoundingClientRect();
-                joystickCenter.x = rect.left + rect.width / 2;
-                joystickCenter.y = rect.top + rect.height / 2;
-                handleJoystickMove(e.targetTouches[0].clientX, e.targetTouches[0].clientY);
-            });
-            joystickZone.addEventListener('touchmove', (e) => {
-                e.preventDefault(); if (!joystickActive) return;
-                handleJoystickMove(e.targetTouches[0].clientX, e.targetTouches[0].clientY);
-            });
-            joystickZone.addEventListener('touchend', (e) => {
-                e.preventDefault(); joystickActive = false;
-                joystickStick.style.transform = `translate(0px, 0px)`;
-            });
-
-            function handleJoystickMove(touchX, touchY) {
-                let dx = touchX - joystickCenter.x; let dy = touchY - joystickCenter.y;
-                let dist = Math.sqrt(dx * dx + dy * dy); let maxLen = 45;
-                joystickAngle = Math.atan2(dy, dx);
-                if (dist > maxLen) { dx = Math.cos(joystickAngle) * maxLen; dy = Math.sin(joystickAngle) * maxLen; }
-                joystickStick.style.transform = `translate(${dx}px, ${dy}px)`;
-                targetAngle = joystickAngle;
-            }
-
-            function updateAngle() {
-                if (isMobile || !isPlaying || !otherPlayers['player']) return;
-                let me = otherPlayers['player'];
-                let headScreenX = me.x - camera.x; let headScreenY = me.y - camera.y;
-                targetAngle = Math.atan2(mouse.y - headScreenY, mouse.x - headScreenX);
-            }
-
-            boostBtn.addEventListener('touchstart', (e) => { e.preventDefault(); isBoosting = true; boostBtn.classList.add('active'); });
-            boostBtn.addEventListener('touchend', (e) => { e.preventDefault(); isBoosting = false; boostBtn.classList.remove('active'); });
-            shiftBtn.addEventListener('touchstart', (e) => { e.preventDefault(); activateQuantumShift(); });
-
-            // ОТПРАВКА СЕТЕВОГО ИНПУТА В ОНЛАЙНЕ
-            setInterval(() => {
-                if (isPlaying && !isOfflineMode && socket && socket.connected) {
-                    socket.emit('update_input', { targetAngle: targetAngle, isBoosting: isBoosting });
+                if (e.code === 'Space') {
+                    e.preventDefault();
+                    isBoosting = true;
                 }
-            }, 50);
+                if (e.key.toLowerCase() === 't' || e.key.toLowerCase() === 'е') {
+                    activateQuantumShift();
+                }
+            });
+            window.addEventListener('keyup', (e) => {
+                if (e.code === 'Space') isBoosting = false;
+            });
 
-            // ЗАПУСК МУЛЬТИПЛЕЕРА
             playBtn.addEventListener('click', () => {
-                if (!socket) return alert("Сетевой модуль недоступен.");
-                isOfflineMode = false;
-                socket.connect();
-                let pName = nicknameInput.value.trim() || "Player";
-                enterGameVisibility();
-                currentSkin = SKINS[Math.floor(Math.random() * SKINS.length)];
-                socket.emit('init_player', { name: pName, skin: currentSkin });
-            });
+                if (playBtn.disabled) return;
+                playBtn.disabled = true;
 
-            // ЗАПУСК ОФФЛАЙН РЕЖИМА С БОТАМИ
-            botsBtn.addEventListener('click', () => {
-                isOfflineMode = true;
-                let pName = nicknameInput.value.trim() || "Player";
-                enterGameVisibility();
-                initOfflineEngine(pName);
-            });
-
-            function enterGameVisibility() {
+                playerName = nicknameInput.value.trim() || "Player";
                 menu.style.opacity = 0;
                 setTimeout(() => {
-                    menu.style.display = 'none'; canvas.style.display = 'block';
-                    massCounterUI.style.display = 'block'; leaderboardUI.style.display = 'block';
-                    checkDevice();
-                    joystickZone.style.display = isMobile ? 'flex' : 'none';
-                    mobileButtonsZone.style.display = 'flex';
-                    resizeCanvas();
-                    if(cdInterval) clearInterval(cdInterval);
-                    isCooldown = false; shiftBtn.classList.remove('cooldown'); cdTimerText.style.display = 'none';
+                    menu.style.display = 'none';
+                    canvas.style.display = 'block';
+                    
+                    detectDevice();
+                    // Показываем кнопку снизу слева ТОЛЬКО если это ПК
+                    if (!isMobile) {
+                        uiLayer.style.display = 'flex';
+                    } else {
+                        uiLayer.style.display = 'none';
+                    }
+
+                    massCounterUI.style.display = 'block';
+                    leaderboardUI.style.display = 'block';
+                    initGame();
                 }, 500);
+            });
+
+            function initGame() {
+                if (gameLoopId) {
+                    cancelAnimationFrame(gameLoopId);
+                }
+
+                currentSkin = SKINS[Math.floor(Math.random() * SKINS.length)];
+                isBoosting = false;
+                boostTimer = 0;
+                resizeCanvas();
+                
+                if(cdInterval) clearInterval(cdInterval);
+                isCooldown = false;
+                skillBtn.classList.remove('cooldown');
+                cdTimerText.style.display = 'none';
+
+                socket.emit('init_player', {
+                    name: playerName,
+                    skin: currentSkin
+                });
+
+                skillBtn.onclick = activateQuantumShift;
+                lastTime = performance.now();
+                gameLoopId = requestAnimationFrame(gameLoop);
             }
 
             function gameOver() {
                 isPlaying = false;
-                if(!isOfflineMode && socket) socket.disconnect();
-                canvas.style.display = 'none'; joystickZone.style.display = 'none'; mobileButtonsZone.style.display = 'none';
-                massCounterUI.style.display = 'none'; leaderboardUI.style.display = 'none'; menu.style.display = 'flex';
-                setTimeout(() => { menu.style.opacity = 1; }, 50);
+                isBoosting = false;
+                
+                if (gameLoopId) {
+                    cancelAnimationFrame(gameLoopId);
+                    gameLoopId = null;
+                }
+
+                otherPlayers = {};
+
+                canvas.style.display = 'none';
+                uiLayer.style.display = 'none';
+                massCounterUI.style.display = 'none';
+                leaderboardUI.style.display = 'none';
+                
+                menu.style.display = 'flex';
+                setTimeout(() => {
+                    menu.style.opacity = 1;
+                    playBtn.disabled = false;
+                }, 50);
             }
 
-            function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; checkDevice(); }
+            function resizeCanvas() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                detectDevice();
+            }
             window.addEventListener('resize', resizeCanvas);
 
             function activateQuantumShift() {
                 if (isCooldown || !isPlaying) return;
-                
-                if (isOfflineMode) {
-                    // Оффлайн логика разворота
-                    let me = otherPlayers['player'];
-                    if(me && me.snake.length > 1) {
-                        me.snake.reverse();
-                        me.x = me.snake[0].x; me.y = me.snake[0].y;
-                        let dx = me.snake[0].x - me.snake[1].x;
-                        let dy = me.snake[0].y - me.snake[1].y;
-                        me.angle = Math.atan2(dy, dx); targetAngle = me.angle;
-                    }
-                } else {
-                    if(socket) socket.emit('quantum_shift');
-                }
 
-                isCooldown = true; cdRemaining = cdDuration;
-                shiftBtn.classList.add('cooldown'); cdTimerText.style.display = 'flex'; cdTimerText.innerText = cdRemaining;
+                socket.emit('quantum_shift');
+
+                isCooldown = true;
+                cdRemaining = cdDuration;
+                skillBtn.classList.add('cooldown');
+                cdTimerText.style.display = 'flex';
+                cdTimerText.innerText = cdRemaining;
+
                 cdInterval = setInterval(() => {
-                    cdRemaining--; cdTimerText.innerText = cdRemaining;
-                    if (cdRemaining <= 0) { clearInterval(cdInterval); isCooldown = false; shiftBtn.classList.remove('cooldown'); cdTimerText.style.display = 'none'; }
+                    cdRemaining--;
+                    cdTimerText.innerText = cdRemaining;
+                    if (cdRemaining <= 0) {
+                        clearInterval(cdInterval);
+                        isCooldown = false;
+                        skillBtn.classList.remove('cooldown');
+                        cdTimerText.style.display = 'none';
+                    }
                 }, 1000);
-            }
-
-            // ==========================================
-            // ЛОКАЛЬНЫЙ ОФФЛАЙН ДВИЖОК ДЛЯ ИГРЫ БЕЗ ИНЕТА
-            // ==========================================
-            function initOfflineEngine(playerName) {
-                foods = []; otherPlayers = {}; particles = [];
-                currentSkin = SKINS[Math.floor(Math.random() * SKINS.length)];
-
-                // Создаем еду
-                for (let i = 0; i < 400; i++) foods.push(createOfflineFood());
-
-                // Инициализируем игрока
-                otherPlayers['player'] = {
-                    id: 'player', name: playerName, x: WORLD_SIZE/2, y: WORLD_SIZE/2,
-                    angle: 0, score: 35, skin: currentSkin,
-                    snake: Array.from({length: 15}, (_, i) => ({x: WORLD_SIZE/2 - i*SEGMENT_SPACING, y: WORLD_SIZE/2}))
-                };
-
-                // Создаем 15 ботов
-                for (let i = 0; i < 15; i++) {
-                    let botId = 'bot_' + i;
-                    let bx = Math.random() * (WORLD_SIZE - 400) + 200;
-                    let by = Math.random() * (WORLD_SIZE - 400) + 200;
-                    let bSkin = SKINS[Math.floor(Math.random() * SKINS.length)];
-                    otherPlayers[botId] = {
-                        id: botId, name: "IvyBot " + (i+1), x: bx, y: by,
-                        angle: Math.random() * Math.PI * 2, score: Math.floor(Math.random() * 50) + 30,
-                        skin: bSkin, isBot: true, botTurnTimer: 0,
-                        snake: Array.from({length: 12}, (_, k) => ({x: bx - k*SEGMENT_SPACING, y: by}))
-                    };
-                }
-
-                isPlaying = true;
-                camera.x = otherPlayers['player'].x - canvas.width / 2;
-                camera.y = otherPlayers['player'].y - canvas.height / 2;
-            }
-
-            function createOfflineFood() {
-                return {
-                    id: Math.random(),
-                    x: Math.random() * (WORLD_SIZE - 40) + 20,
-                    y: Math.random() * (WORLD_SIZE - 40) + 20,
-                    radius: Math.random() * 3 + 3,
-                    color: `hsl(${Math.random() * 360}, 100%, 60%)`
-                };
-            }
-
-            function updateOfflineLogic() {
-                if (!isPlaying || !isOfflineMode) return;
-
-                // 1. Движение игрока
-                let me = otherPlayers['player'];
-                if (me) {
-                    // Плавный поворот (физика с постоянным радиусом)
-                    let angleDiff = targetAngle - me.angle;
-                    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-                    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-                    me.angle += angleDiff * 0.12;
-
-                    let speed = isBoosting && me.score > 15 ? 4.5 : 2.5;
-                    if(isBoosting && me.score > 15 && Math.random() < 0.15) {
-                        me.score--;
-                        foods.push({ id: Math.random(), x: me.snake[me.snake.length-1].x, y: me.snake[me.snake.length-1].y, radius: 3, color: me.skin.body[1] });
-                    }
-
-                    me.x += Math.cos(me.angle) * speed;
-                    me.y += Math.sin(me.angle) * speed;
-                    
-                    // Обновление хвоста
-                    updateSnakeSegments(me);
-
-                    // Проверка выхода за границы
-                    if (me.x < 0 || me.x > WORLD_SIZE || me.y < 0 || me.y > WORLD_SIZE) {
-                        createExplosion(me.x, me.y, me.skin.head[1], 40);
-                        gameOver(); return;
-                    }
-                }
-
-                // 2. Движение и логика ботов
-                for (let id in otherPlayers) {
-                    let p = otherPlayers[id];
-                    if (!p.isBot) continue;
-
-                    p.botTurnTimer--;
-                    if(p.botTurnTimer <= 0) {
-                        p.angle = Math.random() * Math.PI * 2;
-                        p.botTurnTimer = Math.random() * 80 + 40;
-                    }
-
-                    let bSpeed = 2.2;
-                    p.x += Math.cos(p.angle) * bSpeed;
-                    p.y += Math.sin(p.angle) * bSpeed;
-
-                    // Отскок бота от стен, чтобы они не вымирали сразу
-                    if (p.x < 100) p.angle = 0; if (p.x > WORLD_SIZE - 100) p.angle = Math.PI;
-                    if (p.y < 100) p.angle = Math.PI/2; if (p.y > WORLD_SIZE - 100) p.angle = -Math.PI/2;
-
-                    updateSnakeSegments(p);
-                }
-
-                // 3. Поедание еды (оффлайн)
-                for (let id in otherPlayers) {
-                    let p = otherPlayers[id];
-                    for (let i = foods.length - 1; i >= 0; i--) {
-                        let f = foods[i];
-                        let dx = p.x - f.x; let dy = p.y - f.y;
-                        if (dx*dx + dy*dy < (maxSegmentRadius + f.radius) * (maxSegmentRadius + f.radius)) {
-                            foods.splice(i, 1);
-                            p.score += Math.floor(f.radius / 2);
-                            foods.push(createOfflineFood());
-                        }
-                    }
-                }
-
-                // 4. Проверка столкновений (убийства змеек)
-                let deadBots = [];
-                for (let idA in otherPlayers) {
-                    let pA = otherPlayers[idA]; // Кто может врезаться головой
-
-                    for (let idB in otherPlayers) {
-                        let pB = otherPlayers[idB]; // В чей хвост врезаются
-                        if (idA === idB) continue;
-
-                        // Перебираем сегменты тела игрока B (кроме самой головы)
-                        for (let j = 1; j < pB.snake.length; j++) {
-                            let seg = pB.snake[j];
-                            let dx = pA.x - seg.x; let dy = pA.y - seg.y;
-                            if (dx*dx + dy*dy < (maxSegmentRadius * 1.5) * (maxSegmentRadius * 1.5)) {
-                                createExplosion(pA.x, pA.y, pA.skin.head[1], 30);
-                                
-                                // Превращаем погибшего в еду
-                                pA.snake.forEach(s => {
-                                    if(Math.random() < 0.4) foods.push({ id: Math.random(), x: s.x + (Math.random()*10-5), y: s.y + (Math.random()*10-5), radius: 4, color: pA.skin.body[1] });
-                                });
-
-                                if (idA === 'player') { gameOver(); return; } 
-                                else { deadBots.push(idA); pB.score += 15; }
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                // Удаляем мертвых ботов и спавним новых
-                deadBots.forEach(id => {
-                    delete otherPlayers[id];
-                    // Спавним нового бота взамен
-                    let botId = 'bot_' + Math.random();
-                    let bx = Math.random() * (WORLD_SIZE - 400) + 200; let by = Math.random() * (WORLD_SIZE - 400) + 200;
-                    otherPlayers[botId] = {
-                        id: botId, name: "NeonBot " + Math.floor(Math.random()*100), x: bx, y: by,
-                        angle: Math.random() * Math.PI * 2, score: 35, skin: SKINS[Math.floor(Math.random()*SKINS.length)],
-                        isBot: true, botTurnTimer: 60, snake: Array.from({length: 12}, (_, k) => ({x: bx - k*SEGMENT_SPACING, y: by}))
-                    };
-                });
-
-                // Обновляем текст массы локально
-                if(otherPlayers['player']) massCounterUI.innerText = `MASS: ${otherPlayers['player'].score}`;
-                updateLeaderboard();
-            }
-
-            function updateSnakeSegments(p) {
-                // Расчет длины на основе очков змейки
-                let targetLength = Math.floor(p.score / 2) + 4;
-                if(targetLength < 10) targetLength = 10;
-
-                let head = p.snake[0];
-                head.x = p.x; head.y = p.y; head.angle = p.angle;
-
-                for (let i = 1; i < p.snake.length; i++) {
-                    let cur = p.snake[i]; let prev = p.snake[i-1];
-                    let dx = cur.x - prev.x; let dy = cur.y - prev.y;
-                    let len = Math.sqrt(dx*dx + dy*dy);
-                    if (len > SEGMENT_SPACING) {
-                        let angle = Math.atan2(dy, dx);
-                        cur.x = prev.x + Math.cos(angle) * SEGMENT_SPACING;
-                        cur.y = prev.y + Math.sin(angle) * SEGMENT_SPACING;
-                    }
-                }
-
-                while(p.snake.length < targetLength) {
-                    let last = p.snake[p.snake.length-1];
-                    p.snake.push({x: last.x, y: last.y});
-                }
-                while(p.snake.length > targetLength) {
-                    p.snake.pop();
-                }
             }
 
             function createExplosion(x, y, color, count = 20) {
                 for (let i = 0; i < count; i++) {
-                    let angle = Math.random() * Math.PI * 2; let speed = Math.random() * 5 + 2;
+                    let angle = Math.random() * Math.PI * 2;
+                    let speed = Math.random() * 5 + 2;
                     particles.push({
-                        x: x, y: y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
-                        radius: Math.random() * 4 + 2, color: color, alpha: 1, decay: Math.random() * 0.03 + 0.015
+                        x: x,
+                        y: y,
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed,
+                        radius: Math.random() * 4 + 2,
+                        color: color,
+                        alpha: 1,
+                        decay: Math.random() * 0.03 + 0.015
                     });
                 }
             }
 
-            function updateVisuals() {
+            function gameLoop(timestamp) {
+                if (!isPlaying) return;
+                
+                let dt = timestamp - lastTime;
+                if (dt > 100 || isNaN(dt)) dt = 16.67; 
+                lastTime = timestamp;
+
+                update(dt);
+                if (isPlaying) render(); 
+                gameLoopId = requestAnimationFrame(gameLoop);
+            }
+
+            function update(dt) {
+                if (snake.length === 0) return;
+                let head = snake[0];
+
+                let headScreenX = head.x - camera.x;
+                let headScreenY = head.y - camera.y;
+                let targetAngle = Math.atan2(mouse.y - headScreenY, mouse.x - headScreenX);
+
+                if (socket.connected) {
+                    socket.emit('update_input', { targetAngle: targetAngle, isBoosting: isBoosting });
+                }
+
+                // Физика искр
                 for (let i = particles.length - 1; i >= 0; i--) {
-                    let p = particles[i]; p.x += p.vx; p.y += p.vy; p.alpha -= p.decay;
+                    let p = particles[i];
+                    p.x += p.vx * (dt / 16.67);
+                    p.y += p.vy * (dt / 16.67);
+                    p.alpha -= p.decay * (dt / 16.67);
                     if (p.alpha <= 0) particles.splice(i, 1);
                 }
-                
-                let targetNode = isOfflineMode ? otherPlayers['player'] : otherPlayers[socket.id];
-                if (isPlaying && targetNode) {
-                    camera.x += (targetNode.x - canvas.width / 2 - camera.x) * 0.08;
-                    camera.y += (targetNode.y - canvas.height / 2 - camera.y) * 0.08;
-                }
+
+                let targetCamX = head.x - canvas.width / 2;
+                let targetCamY = head.y - canvas.height / 2;
+
+                camera.x += (targetCamX - camera.x) * cameraSpeed;
+                camera.y += (targetCamY - camera.y) * cameraSpeed;
+
+                massCounterUI.innerText = `MASS: ${score}`;
             }
 
             function updateLeaderboard() {
-                let allPlayers = Object.values(otherPlayers);
+                let allPlayers = [];
+                if (isPlaying && snake.length > 0) {
+                    allPlayers.push({ name: playerName, score: score, isMe: true });
+                }
+                for (let id in otherPlayers) {
+                    allPlayers.push({ name: otherPlayers[id].name, score: otherPlayers[id].score, isMe: false });
+                }
+
                 allPlayers.sort((a, b) => b.score - a.score);
+
                 leaderList.innerHTML = "";
-                
-                let currentId = isOfflineMode ? 'player' : (socket ? socket.id : null);
                 allPlayers.slice(0, 10).forEach((p, index) => {
                     let item = document.createElement('div');
-                    item.className = (p.id === currentId) ? 'leader-item player' : 'leader-item';
+                    item.className = p.isMe ? 'leader-item player' : 'leader-item';
                     item.innerHTML = `<span>${index + 1}. ${p.name}</span><span>${p.score}</span>`;
                     leaderList.appendChild(item);
                 });
             }
 
-            function draw() {
+            function render() {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.save(); ctx.translate(-camera.x, -camera.y);
 
-                // Сетка
-                ctx.strokeStyle = '#11161d'; ctx.lineWidth = 1;
-                for (let x = 0; x <= WORLD_SIZE; x += 60) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, WORLD_SIZE); ctx.stroke(); }
-                for (let y = 0; y <= WORLD_SIZE; y += 60) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WORLD_SIZE, y); ctx.stroke(); }
+                ctx.save();
+                ctx.translate(-camera.x, -camera.y);
 
-                // Граница
-                ctx.strokeStyle = '#ff0055'; ctx.lineWidth = 5; ctx.strokeRect(0, 0, WORLD_SIZE, WORLD_SIZE);
+                // Отрисовка сетки
+                ctx.strokeStyle = '#11161d';
+                ctx.lineWidth = 1;
+                let gridSize = 60;
+                for (let x = 0; x <= WORLD_WIDTH; x += gridSize) {
+                    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, WORLD_HEIGHT); ctx.stroke();
+                }
+                for (let y = 0; y <= WORLD_HEIGHT; y += gridSize) {
+                    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WORLD_WIDTH, y); ctx.stroke();
+                }
 
-                // Еда
-                foods.forEach(f => { ctx.beginPath(); ctx.arc(f.x, f.y, f.radius, 0, Math.PI * 2); ctx.fillStyle = f.color; ctx.fill(); });
+                // Красная граница мира
+                ctx.strokeStyle = '#ff0055';
+                ctx.lineWidth = 5;
+                ctx.strokeRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
-                // Змейки
+                // Рендеринг еды
+                for (let i = 0; i < foods.length; i++) {
+                    let f = foods[i];
+                    if (f.x < camera.x - 20 || f.x > camera.x + canvas.width + 20 ||
+                        f.y < camera.y - 20 || f.y > camera.y + canvas.height + 20) continue;
+
+                    ctx.beginPath();
+                    ctx.arc(f.x, f.y, f.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = f.color;
+                    ctx.fill();
+                    ctx.closePath();
+                }
+
+                // РЕНДЕРИНГ ОППОНЕНТОВ
                 for (let id in otherPlayers) {
                     let p = otherPlayers[id];
                     if (!p.snake || p.snake.length === 0) continue;
 
                     for (let i = p.snake.length - 1; i >= 0; i--) {
-                        let seg = p.snake[i]; let r = maxSegmentRadius;
+                        let seg = p.snake[i];
+                        let r = maxSegmentRadius;
                         if (i > p.snake.length * 0.75) {
-                            r = maxSegmentRadius * (1 - ((i - p.snake.length * 0.75) / (p.snake.length * 0.25)) * 0.15); 
+                            let factor = (i - p.snake.length * 0.75) / (p.snake.length * 0.25);
+                            r = maxSegmentRadius * (1 - factor * 0.15); 
                         }
 
-                        ctx.beginPath(); ctx.arc(seg.x, seg.y, r, 0, Math.PI * 2);
+                        ctx.beginPath();
+                        ctx.arc(seg.x, seg.y, r, 0, Math.PI * 2);
+
                         let gradient = ctx.createRadialGradient(seg.x - r * 0.3, seg.y - r * 0.3, r * 0.1, seg.x, seg.y, r);
                         let skin = p.skin || SKINS[0];
 
                         if (i === 0) {
-                            gradient.addColorStop(0, skin.head[0]); gradient.addColorStop(0.2, skin.head[1]); gradient.addColorStop(1, skin.head[2]);
-                            if (p.spawnProtection > 0) ctx.globalAlpha = 0.5; else { ctx.shadowBlur = 15; ctx.shadowColor = skin.head[1]; }
+                            gradient.addColorStop(0, skin.head[0]);
+                            gradient.addColorStop(0.2, skin.head[1]);
+                            gradient.addColorStop(1, skin.head[2]);
+                            ctx.shadowBlur = 15; ctx.shadowColor = skin.head[1];
                         } else if (i === p.snake.length - 1) {
-                            gradient.addColorStop(0, skin.tail[0]); gradient.addColorStop(0.2, skin.tail[1]); gradient.addColorStop(1, skin.tail[2]);
+                            gradient.addColorStop(0, skin.tail[0]);
+                            gradient.addColorStop(0.2, skin.tail[1]);
+                            gradient.addColorStop(1, skin.tail[2]);
+                            ctx.shadowBlur = 0;
                         } else {
-                            gradient.addColorStop(0, skin.body[0]); gradient.addColorStop(0.3, skin.body[1]); gradient.addColorStop(1, skin.body[2]);
+                            gradient.addColorStop(0, skin.body[0]);
+                            gradient.addColorStop(0.3, skin.body[1]);
+                            gradient.addColorStop(1, skin.body[2]);
+                            ctx.shadowBlur = 0;
                         }
 
                         ctx.fillStyle = gradient; ctx.fill(); ctx.closePath(); ctx.shadowBlur = 0;
 
                         if (i === 0) {
-                            let headAngle = seg.angle || p.angle;
-                            let leftEyeX = seg.x + Math.cos(headAngle - 0.6) * r * 0.5;
-                            let leftEyeY = seg.y + Math.sin(headAngle - 0.6) * r * 0.5;
-                            let rightEyeX = seg.x + Math.cos(headAngle + 0.6) * r * 0.5;
-                            let rightEyeY = seg.y + Math.sin(headAngle + 0.6) * r * 0.5;
+                            let headAngle = seg.angle;
+                            let eyeDist = r * 0.5; let eyeRadius = r * 0.35; let pupilRadius = r * 0.18;
+                            let leftEyeX = seg.x + Math.cos(headAngle - 0.6) * eyeDist;
+                            let leftEyeY = seg.y + Math.sin(headAngle - 0.6) * eyeDist;
+                            let rightEyeX = seg.x + Math.cos(headAngle + 0.6) * eyeDist;
+                            let rightEyeY = seg.y + Math.sin(headAngle + 0.6) * eyeDist;
 
                             ctx.fillStyle = '#ffffff';
-                            ctx.beginPath(); ctx.arc(leftEyeX, leftEyeY, r * 0.35, 0, Math.PI * 2); ctx.fill();
-                            ctx.beginPath(); ctx.arc(rightEyeX, rightEyeY, r * 0.35, 0, Math.PI * 2); ctx.fill();
+                            ctx.beginPath(); ctx.arc(leftEyeX, leftEyeY, eyeRadius, 0, Math.PI * 2); ctx.fill();
+                            ctx.beginPath(); ctx.arc(rightEyeX, rightEyeY, eyeRadius, 0, Math.PI * 2); ctx.fill();
 
                             ctx.fillStyle = '#000000';
-                            ctx.beginPath(); ctx.arc(leftEyeX + Math.cos(headAngle)*2, leftEyeY + Math.sin(headAngle)*2, r * 0.18, 0, Math.PI * 2); ctx.fill();
-                            ctx.beginPath(); ctx.arc(rightEyeX + Math.cos(headAngle)*2, rightEyeY + Math.sin(headAngle)*2, r * 0.18, 0, Math.PI * 2); ctx.fill();
+                            ctx.beginPath(); ctx.arc(leftEyeX + Math.cos(headAngle)*2, leftEyeY + Math.sin(headAngle)*2, pupilRadius, 0, Math.PI * 2); ctx.fill();
+                            ctx.beginPath(); ctx.arc(rightEyeX + Math.cos(headAngle)*2, rightEyeY + Math.sin(headAngle)*2, pupilRadius, 0, Math.PI * 2); ctx.fill();
 
-                            let currentId = isOfflineMode ? 'player' : (socket ? socket.id : null);
-                            ctx.fillStyle = (id === currentId) ? '#66fcf1' : '#ffffff'; ctx.font = 'bold 14px Segoe UI'; ctx.textAlign = 'center';
+                            ctx.fillStyle = '#ffffff'; ctx.font = 'bold 14px Segoe UI'; ctx.textAlign = 'center';
                             ctx.shadowColor = '#000000'; ctx.shadowBlur = 4;
                             ctx.fillText(p.name, seg.x, seg.y - r - 8); ctx.shadowBlur = 0;
-                            ctx.globalAlpha = 1.0;
                         }
                     }
                 }
 
-                // Частицы
-                particles.forEach(p => {
-                    ctx.save(); ctx.globalAlpha = p.alpha; ctx.fillStyle = p.color;
-                    ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-                });
+                // РЕНДЕРИНГ СВОЕЙ ЗМЕЙКИ
+                for (let i = snake.length - 1; i >= 0; i--) {
+                    let seg = snake[i];
+                    let r = maxSegmentRadius;
+                    if (i > snake.length * 0.75) {
+                        let factor = (i - snake.length * 0.75) / (snake.length * 0.25);
+                        r = maxSegmentRadius * (1 - factor * 0.15); 
+                    }
+
+                    ctx.beginPath();
+                    ctx.arc(seg.x, seg.y, r, 0, Math.PI * 2);
+                    
+                    let gradient = ctx.createRadialGradient(seg.x - r * 0.3, seg.y - r * 0.3, r * 0.1, seg.x, seg.y, r);
+
+                    if (i === 0) {
+                        gradient.addColorStop(0, currentSkin.head[0]);
+                        gradient.addColorStop(0.2, currentSkin.head[1]);
+                        gradient.addColorStop(1, currentSkin.head[2]);
+                        ctx.shadowBlur = 15; ctx.shadowColor = currentSkin.head[1];
+                    } else if (i === snake.length - 1) {
+                        gradient.addColorStop(0, currentSkin.tail[0]);
+                        gradient.addColorStop(0.2, currentSkin.tail[1]);
+                        gradient.addColorStop(1, currentSkin.tail[2]);
+                        ctx.shadowBlur = 0; 
+                    } else {
+                        gradient.addColorStop(0, currentSkin.body[0]);
+                        gradient.addColorStop(0.3, currentSkin.body[1]);
+                        gradient.addColorStop(1, currentSkin.body[2]);
+                        ctx.shadowBlur = 0;
+                    }
+                    
+                    ctx.fillStyle = gradient; ctx.fill(); ctx.closePath(); ctx.shadowBlur = 0; 
+
+                    if (i === 0) {
+                        let headAngle = seg.angle;
+                        let eyeDist = r * 0.5; let eyeRadius = r * 0.35; let pupilRadius = r * 0.18;
+                        let leftEyeX = seg.x + Math.cos(headAngle - 0.6) * eyeDist;
+                        let leftEyeY = seg.y + Math.sin(headAngle - 0.6) * eyeDist;
+                        let rightEyeX = seg.x + Math.cos(headAngle + 0.6) * eyeDist;
+                        let rightEyeY = seg.y + Math.sin(headAngle + 0.6) * eyeDist;
+
+                        ctx.fillStyle = '#ffffff';
+                        ctx.beginPath(); ctx.arc(leftEyeX, leftEyeY, eyeRadius, 0, Math.PI * 2); ctx.fill();
+                        ctx.beginPath(); ctx.arc(rightEyeX, rightEyeY, eyeRadius, 0, Math.PI * 2); ctx.fill();
+
+                        ctx.fillStyle = '#000000';
+                        ctx.beginPath(); ctx.arc(leftEyeX + Math.cos(headAngle)*2, leftEyeY + Math.sin(headAngle)*2, pupilRadius, 0, Math.PI * 2); ctx.fill();
+                        ctx.beginPath(); ctx.arc(rightEyeX + Math.cos(headAngle)*2, rightEyeY + Math.sin(headAngle)*2, pupilRadius, 0, Math.PI * 2); ctx.fill();
+
+                        ctx.fillStyle = '#66fcf1'; ctx.font = 'bold 14px Segoe UI'; ctx.textAlign = 'center';
+                        ctx.shadowColor = '#000000'; ctx.shadowBlur = 4;
+                        ctx.fillText(playerName, seg.x, seg.y - r - 8); ctx.shadowBlur = 0;
+                    }
+                }
+
+                // ЭФФЕКТЫ ЧАСТИЦ
+                for (let i = 0; i < particles.length; i++) {
+                    let p = particles[i];
+                    ctx.save();
+                    ctx.globalAlpha = p.alpha;
+                    ctx.fillStyle = p.color;
+                    ctx.shadowBlur = 10; ctx.shadowColor = p.color;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+
                 ctx.restore();
 
-                // РАДАР СЛЕВА СВЕРХУ
-                let radarSize = isMobile ? 100 : 130; let radarX = 20; let radarY = 20;
+                // РАДАР (МИНИКАРТА) — НАПК И НА МОБИЛКАХ ВСЕГДА СНИЗУ СПРАВА
+                let radarSize = 130; let radarPadding = 25;
+                let radarX = canvas.width - radarSize - radarPadding;
+                let radarY = canvas.height - radarSize - radarPadding;
+
                 ctx.fillStyle = 'rgba(11, 12, 16, 0.85)'; ctx.strokeStyle = '#45a29e'; ctx.lineWidth = 2;
                 ctx.fillRect(radarX, radarY, radarSize, radarSize); ctx.strokeRect(radarX, radarY, radarSize, radarSize);
 
-                let currentId = isOfflineMode ? 'player' : (socket ? socket.id : null);
                 for (let id in otherPlayers) {
                     let op = otherPlayers[id];
-                    ctx.fillStyle = (op.skin) ? op.skin.head[1] : '#66fcf1';
-                    ctx.beginPath(); ctx.arc(radarX + (op.x / WORLD_SIZE) * radarSize, radarY + (op.y / WORLD_SIZE) * radarSize, (id === currentId)? 4: 3.5, 0, Math.PI * 2); ctx.fill();
+                    let opRadarX = radarX + (op.x / WORLD_WIDTH) * radarSize;
+                    let opRadarY = radarY + (op.y / WORLD_HEIGHT) * radarSize;
+                    let opSkin = op.skin || SKINS[0];
+                    ctx.fillStyle = opSkin.head[1]; 
+                    ctx.beginPath(); ctx.arc(opRadarX, opRadarY, 3.5, 0, Math.PI * 2); ctx.fill();
+                }
+
+                if (snake.length > 0) {
+                    let head = snake[0];
+                    let playerRadarX = radarX + (head.x / WORLD_WIDTH) * radarSize;
+                    let playerRadarY = radarY + (head.y / WORLD_HEIGHT) * radarSize;
+
+                    ctx.fillStyle = currentSkin.head[1]; ctx.beginPath(); ctx.arc(playerRadarX, playerRadarY, 4, 0, Math.PI * 2); ctx.fill();
                 }
             }
-
-            function gameLoop() {
-                if(isOfflineMode) updateOfflineLogic();
-                updateVisuals();
-                draw();
-                requestAnimationFrame(gameLoop);
-            }
-            requestAnimationFrame(gameLoop);
         })();
     </script>
 </body>
