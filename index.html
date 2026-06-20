@@ -2,11 +2,12 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Revert.io (Серверная версия)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Revert.io (Мобильная версия)</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; touch-action: none; }
         body, html { width: 100%; height: 100%; overflow: hidden; background-color: #0b0c10; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
         #main-menu {
             position: absolute; width: 100%; height: 100%; z-index: 10;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -18,10 +19,11 @@
             text-shadow: 0 0 10px #66fcf1, 0 0 30px #45a29e;
             letter-spacing: 5px; margin-bottom: 10px;
         }
+        @media (max-width: 768px) { .title { font-size: 48px; } }
+        
         #tips {
-            font-size: 18px; color: #c5a059; height: 30px; margin-bottom: 40px;
-            text-shadow: 0 0 5px rgba(197, 160, 89, 0.5);
-            transition: opacity 0.5s ease; opacity: 0;
+            font-size: 18px; color: #c5a059; height: 30px; margin-bottom: 40px; text-align: center; padding: 0 10px;
+            text-shadow: 0 0 5px rgba(197, 160, 89, 0.5); transition: opacity 0.5s ease; opacity: 0;
         }
         #nickname {
             width: 280px; padding: 15px; font-size: 18px; border: 2px solid #45a29e;
@@ -37,39 +39,63 @@
         #play-btn:hover:not(:disabled) { transform: scale(1.05); background: #fff; box-shadow: 0 0 25px #fff; }
         #play-btn:disabled { background: #45a29e; color: #1f2833; cursor: not-allowed; box-shadow: none; opacity: 0.6; }
         #game-canvas { display: none; width: 100%; height: 100%; background: #0c0f12; }
+        
+        /* СЧЕТЧИК МАССЫ (Сдвинут чуть ниже, чтобы на телефонах не пересекаться с радаром) */
         #mass-counter {
-            display: none; position: absolute; top: 20px; left: 20px; z-index: 5;
+            display: none; position: absolute; top: 160px; left: 20px; z-index: 5;
             color: #66fcf1; font-size: 24px; font-weight: bold;
             text-shadow: 0 0 10px rgba(102, 252, 241, 0.6);
         }
-        #ui-layer {
-            display: none; position: absolute; bottom: 30px; left: 30px; z-index: 5;
-            display: flex; flex-direction: column; align-items: center;
+        @media (max-width: 768px) { #mass-counter { top: 145px; font-size: 20px; left: 15px; } }
+
+        /* ЭЛЕМЕНТЫ УПРАВЛЕНИЯ ДЛЯ СМАРТФОНОВ */
+        #mobile-joystick-zone {
+            display: none; position: absolute; bottom: 40px; left: 40px;
+            width: 140px; height: 140px; background: rgba(31, 40, 51, 0.3);
+            border: 2px solid rgba(102, 252, 241, 0.4); border-radius: 50%; z-index: 6;
+            align-items: center; justify-content: center;
         }
-        #shift-skill {
-            width: 70px; height: 70px; border-radius: 50%;
-            background: #1f2833; border: 3px solid #66fcf1;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 32px; color: #66fcf1; font-weight: bold;
-            box-shadow: 0 0 15px rgba(102, 252, 241, 0.3);
-            position: relative; cursor: pointer; transition: 0.2s;
+        #mobile-joystick-stick {
+            width: 50px; height: 50px; background: #66fcf1;
+            border-radius: 50%; box-shadow: 0 0 15px #66fcf1;
+            position: absolute; pointer-events: none;
         }
-        #shift-skill.cooldown {
-            border-color: #ff0055; color: #ff0055; opacity: 0.6; cursor: not-allowed;
-            box-shadow: 0 0 15px rgba(255, 0, 85, 0.2);
+        
+        #mobile-buttons-zone {
+            display: none; position: absolute; bottom: 40px; right: 40px;
+            gap: 20px; flex-direction: column; align-items: center; z-index: 6;
         }
-        #cd-timer {
-            position: absolute; width: 100%; height: 100%;
-            display: flex; align-items: center; justify-content: center;
-            background: rgba(11, 12, 16, 0.8); border-radius: 50%;
-            font-size: 20px; font-weight: bold; color: #ff0055; display: none;
+        .mobile-btn {
+            width: 75px; height: 75px; border-radius: 50%;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            font-weight: bold; font-size: 14px; border: 3px solid #66fcf1;
+            box-shadow: 0 0 15px rgba(102, 252, 241, 0.4); transition: 0.1s;
         }
-        .hotkey-hint { margin-top: 5px; color: #888; font-size: 12px; font-weight: bold; text-shadow: 0 2px 4px #000; }
+        #mobile-boost-btn { background: rgba(102, 252, 241, 0.2); color: #66fcf1; }
+        #mobile-boost-btn.active { background: #66fcf1; color: #0b0c10; transform: scale(0.95); box-shadow: 0 0 25px #66fcf1; }
+        
+        #mobile-shift-btn { background: #1f2833; color: #66fcf1; font-size: 28px; position: relative; }
+        #mobile-shift-btn.cooldown { border-color: #ff0055; color: #ff0055; opacity: 0.6; box-shadow: 0 0 15px rgba(255, 0, 85, 0.2); }
+        #mobile-cd-timer {
+            position: absolute; width: 100%; height: 100%; display: flex;
+            align-items: center; justify-content: center; background: rgba(11, 12, 16, 0.85);
+            border-radius: 50%; font-size: 20px; font-weight: bold; color: #ff0055; display: none;
+        }
+
+        /* ПОДСКАЗКА КЛАВИШИ НА ПК */
+        .pc-hint { margin-top: 4px; color: #888; font-size: 11px; font-weight: bold; text-shadow: 0 2px 4px #000; }
+        @media (max-width: 768px) { .pc-hint { display: none; } }
+
         #leaderboard {
             display: none; position: absolute; top: 20px; right: 20px; z-index: 5;
             background: rgba(11, 12, 16, 0.75); border: 1px solid #45a29e;
             border-radius: 8px; width: 220px; padding: 15px; color: #fff;
             box-shadow: 0 0 15px rgba(0,0,0,0.5);
+        }
+        @media (max-width: 768px) {
+            #leaderboard { width: 150px; padding: 8px; top: 15px; right: 15px; }
+            #leaderboard h3 { font-size: 13px; margin-bottom: 5px; }
+            .leader-item { font-size: 11px; }
         }
         #leaderboard h3 { color: #66fcf1; font-size: 18px; margin-bottom: 10px; text-align: center; text-transform: uppercase; border-bottom: 1px solid #45a29e; padding-bottom: 5px;}
         .leader-item { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 4px; color: #c5a059; }
@@ -92,12 +118,20 @@
         <div id="leader-list"></div>
     </div>
 
-    <div id="ui-layer">
-        <div id="shift-skill">
+    <div id="mobile-joystick-zone">
+        <div id="mobile-joystick-stick"></div>
+    </div>
+
+    <div id="mobile-buttons-zone">
+        <div id="mobile-shift-btn" class="mobile-btn">
             ⇄
-            <div id="cd-timer">40</div>
+            <div id="mobile-cd-timer">40</div>
+            <div class="pc-hint">[ T ]</div>
         </div>
-        <div class="hotkey-hint">КЛАВИША [ T ]</div>
+        <div id="mobile-boost-btn" class="mobile-btn">
+            <span>BOOST</span>
+            <div class="pc-hint">[ SPACE ]</div>
+        </div>
     </div>
 
     <canvas id="game-canvas"></canvas>
@@ -105,27 +139,32 @@
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>
         (function() {
-            // Укажи здесь URL своего сервера на Render/Heroku
+            // Замени на URL своего сервера
             const socket = io("https://revert-io-server.onrender.com");
 
             const menu = document.getElementById('main-menu');
             const tipsDiv = document.getElementById('tips');
             const playBtn = document.getElementById('play-btn');
             const canvas = document.getElementById('game-canvas');
-            const uiLayer = document.getElementById('ui-layer');
             const massCounterUI = document.getElementById('mass-counter');
             const leaderboardUI = document.getElementById('leaderboard');
             const leaderList = document.getElementById('leader-list');
-            const skillBtn = document.getElementById('shift-skill');
-            const cdTimerText = document.getElementById('cd-timer');
             const nicknameInput = document.getElementById('nickname');
             const ctx = canvas.getContext('2d');
 
+            // Мобильные элементы UI
+            const joystickZone = document.getElementById('mobile-joystick-zone');
+            const joystickStick = document.getElementById('mobile-joystick-stick');
+            const mobileButtonsZone = document.getElementById('mobile-buttons-zone');
+            const boostBtn = document.getElementById('mobile-boost-btn');
+            const shiftBtn = document.getElementById('mobile-shift-btn');
+            const cdTimerText = document.getElementById('mobile-cd-timer');
+
             const tips = [
-                "Используй кнопку [T], чтобы превратить свой хвост в голову!",
-                "Зажми Пробел или ЛКМ, чтобы активировать турбо-ускорение.",
+                "Используй Квантовый Переворот, чтобы превратить свой хвост в голову!",
+                "Зажми кнопку BOOST или Пробел для резкого ускорения.",
                 "Осторожно! Красная граница карты смертельно опасна!",
-                "Ваша змейка больше не останавливается в фоновом режиме!"
+                "Змейка продолжит ползти, даже если свернуть вкладку браузера."
             ];
             let tipIndex = 0;
             setInterval(() => {
@@ -157,59 +196,53 @@
             let camera = { x: 0, y: 0 };
             let isBoosting = false;
 
+            // Логика кулдауна
             let isCooldown = false;
             let cdDuration = 40; 
             let cdRemaining = 0;
             let cdInterval;
 
+            // Флаг детекта мобильного устройства
+            let isMobile = false;
+            function checkDevice() {
+                isMobile = ('onTouchStart' in window || navigator.maxTouchPoints > 0 || window.innerWidth <= 768);
+            }
+
+            // Переменные для виртуального джойстика
+            let joystickActive = false;
+            let joystickCenter = { x: 0, y: 0 };
+            let joystickAngle = 0;
+
             // СЕТЕВЫЕ СОБЫТИЯ
             socket.on('connect', () => { myId = socket.id; });
-
-            socket.on('init_data', (data) => {
-                foods = data.foods;
-                otherPlayers = data.players;
-            });
-
+            socket.on('init_data', (data) => { foods = data.foods; otherPlayers = data.players; });
             socket.on('spawned', (pData) => {
                 isPlaying = true;
                 camera.x = pData.x - canvas.width / 2;
                 camera.y = pData.y - canvas.height / 2;
             });
-
             socket.on('new_player', (p) => { otherPlayers[p.id] = p; });
             socket.on('player_disconnected', (id) => { delete otherPlayers[id]; });
-
             socket.on('food_update', (data) => {
                 const idx = foods.findIndex(f => f.id === data.eatenId);
                 if (idx !== -1) foods.splice(idx, 1);
                 foods.push(data.newFood);
             });
-
             socket.on('foods_spawned', (newFoods) => { foods = foods.concat(newFoods); });
             socket.on('player_exploded', (data) => { createExplosion(data.x, data.y, data.color, 40); });
-
-            socket.on('player_died_notification', (id) => {
-                if (id === socket.id) {
-                    gameOver();
-                } else {
-                    delete otherPlayers[id];
-                }
-            });
-
+            socket.on('player_died_notification', (id) => { if (id === socket.id) gameOver(); else delete otherPlayers[id]; });
             socket.on('heartbeat', (serverPlayers) => {
                 otherPlayers = serverPlayers;
                 if (isPlaying && otherPlayers[socket.id]) {
-                    let me = otherPlayers[socket.id];
-                    massCounterUI.innerText = `MASS: ${me.score}`;
+                    massCounterUI.innerText = `MASS: ${otherPlayers[socket.id].score}`;
                 }
                 updateLeaderboard();
             });
 
-            // ИНПУТЫ КЛИЕНТА
-            window.addEventListener('mousemove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; });
-            window.addEventListener('mousedown', (e) => { if (e.button === 0 && isPlaying) { isBoosting = true; sendInput(); } });
-            window.addEventListener('mouseup', (e) => { if (e.button === 0) { isBoosting = false; sendInput(); } });
-            
+            // ИНПУТЫ ДЛЯ ПК (Мышь и Клавиатура)
+            window.addEventListener('mousemove', (e) => { if(!joystickActive) { mouse.x = e.clientX; mouse.y = e.clientY; } });
+            window.addEventListener('mousedown', (e) => { if (e.button === 0 && isPlaying && !isMobile) { isBoosting = true; sendInput(); } });
+            window.addEventListener('mouseup', (e) => { if (e.button === 0 && !isMobile) { isBoosting = false; sendInput(); } });
             window.addEventListener('keydown', (e) => {
                 if (!isPlaying) return;
                 if (e.code === 'Space') { e.preventDefault(); isBoosting = true; sendInput(); }
@@ -217,17 +250,69 @@
             });
             window.addEventListener('keyup', (e) => { if (e.code === 'Space') { isBoosting = false; sendInput(); } });
 
+            // ОБРАБОТКА СЕНСОРНОГО ДЖОЙСТИКА (TOUCH EVENTS)
+            joystickZone.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                joystickActive = true;
+                const rect = joystickZone.getBoundingClientRect();
+                joystickCenter.x = rect.left + rect.width / 2;
+                joystickCenter.y = rect.top + rect.height / 2;
+                handleJoystickMove(e.targetTouches[0].clientX, e.targetTouches[0].clientY);
+            });
+
+            joystickZone.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                if (!joystickActive) return;
+                handleJoystickMove(e.targetTouches[0].clientX, e.targetTouches[0].clientY);
+            });
+
+            joystickZone.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                joystickActive = false;
+                joystickStick.style.transform = `translate(0px, 0px)`;
+            });
+
+            function handleJoystickMove(touchX, touchY) {
+                let dx = touchX - joystickCenter.x;
+                let dy = touchY - joystickCenter.y;
+                let dist = Math.sqrt(dx * dx + dy * dy);
+                let maxLen = 45; // Ограничение движения стика внутри кольца
+
+                joystickAngle = Math.atan2(dy, dx);
+
+                if (dist > maxLen) {
+                    dx = Math.cos(joystickAngle) * maxLen;
+                    dy = Math.sin(joystickAngle) * maxLen;
+                }
+
+                joystickStick.style.transform = `translate(${dx}px, ${dy}px)`;
+                sendInput();
+            }
+
+            // МОБИЛЬНЫЕ КНОПКИ (Ускорение и переворот)
+            boostBtn.addEventListener('touchstart', (e) => { e.preventDefault(); isBoosting = true; boostBtn.classList.add('active'); sendInput(); });
+            boostBtn.addEventListener('touchend', (e) => { e.preventDefault(); isBoosting = false; boostBtn.classList.remove('active'); sendInput(); });
+            shiftBtn.addEventListener('touchstart', (e) => { e.preventDefault(); activateQuantumShift(); });
+
             function sendInput() {
                 if (!isPlaying || !otherPlayers[socket.id]) return;
-                let me = otherPlayers[socket.id];
-                let headScreenX = me.x - camera.x;
-                let headScreenY = me.y - camera.y;
-                let targetAngle = Math.atan2(mouse.y - headScreenY, mouse.x - headScreenX);
+                let targetAngle = 0;
+
+                if (isMobile && joystickActive) {
+                    // На мобилках берем угол напрямую с джойстика
+                    targetAngle = joystickAngle;
+                } else {
+                    // На ПК считаем угол относительно центра экрана к курсору мыши
+                    let me = otherPlayers[socket.id];
+                    let headScreenX = me.x - camera.x;
+                    let headScreenY = me.y - camera.y;
+                    targetAngle = Math.atan2(mouse.y - headScreenY, mouse.x - headScreenX);
+                }
                 
                 socket.emit('update_input', { targetAngle: targetAngle, isBoosting: isBoosting });
             }
 
-            // Отправляем угол мыши каждые 50мс
+            // Отправляем пакеты ввода на сервер с интервалом в 50мс
             setInterval(sendInput, 50);
 
             playBtn.addEventListener('click', () => {
@@ -239,16 +324,24 @@
                 setTimeout(() => {
                     menu.style.display = 'none';
                     canvas.style.display = 'block';
-                    uiLayer.style.display = 'flex';
                     massCounterUI.style.display = 'block';
                     leaderboardUI.style.display = 'block';
+                    
+                    checkDevice();
+                    if (isMobile) {
+                        joystickZone.style.display = 'flex';
+                        mobileButtonsZone.style.display = 'flex';
+                    } else {
+                        // На ПК выводим блок кнопок справа только ради подсказки хоткеев
+                        mobileButtonsZone.style.display = 'flex';
+                    }
                     
                     currentSkin = SKINS[Math.floor(Math.random() * SKINS.length)];
                     resizeCanvas();
                     
                     if(cdInterval) clearInterval(cdInterval);
                     isCooldown = false;
-                    skillBtn.classList.remove('cooldown');
+                    shiftBtn.classList.remove('cooldown');
                     cdTimerText.style.display = 'none';
 
                     socket.emit('init_player', { name: pName, skin: currentSkin });
@@ -259,14 +352,15 @@
             function gameOver() {
                 isPlaying = false;
                 canvas.style.display = 'none';
-                uiLayer.style.display = 'none';
+                joystickZone.style.display = 'none';
+                mobileButtonsZone.style.display = 'none';
                 massCounterUI.style.display = 'none';
                 leaderboardUI.style.display = 'none';
                 menu.style.display = 'flex';
                 setTimeout(() => { menu.style.opacity = 1; }, 50);
             }
 
-            function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+            function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; checkDevice(); }
             window.addEventListener('resize', resizeCanvas);
 
             function activateQuantumShift() {
@@ -275,7 +369,7 @@
 
                 isCooldown = true;
                 cdRemaining = cdDuration;
-                skillBtn.classList.add('cooldown');
+                shiftBtn.classList.add('cooldown');
                 cdTimerText.style.display = 'flex';
                 cdTimerText.innerText = cdRemaining;
 
@@ -285,7 +379,7 @@
                     if (cdRemaining <= 0) {
                         clearInterval(cdInterval);
                         isCooldown = false;
-                        skillBtn.classList.remove('cooldown');
+                        shiftBtn.classList.remove('cooldown');
                         cdTimerText.style.display = 'none';
                     }
                 }, 1000);
@@ -305,14 +399,11 @@
             }
 
             function updateVisuals() {
-                // Обновление частиц эффектов локально
                 for (let i = particles.length - 1; i >= 0; i--) {
                     let p = particles[i];
                     p.x += p.vx; p.y += p.vy; p.alpha -= p.decay;
                     if (p.alpha <= 0) particles.splice(i, 1);
                 }
-
-                // Камера плавно следует за нашей головой на сервере
                 if (isPlaying && otherPlayers[socket.id]) {
                     let me = otherPlayers[socket.id];
                     camera.x += (me.x - canvas.width / 2 - camera.x) * 0.08;
@@ -342,7 +433,7 @@
                 for (let x = 0; x <= WORLD_SIZE; x += 60) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, WORLD_SIZE); ctx.stroke(); }
                 for (let y = 0; y <= WORLD_SIZE; y += 60) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WORLD_SIZE, y); ctx.stroke(); }
 
-                // Граница
+                // Граница карты
                 ctx.strokeStyle = '#ff0055'; ctx.lineWidth = 5; ctx.strokeRect(0, 0, WORLD_SIZE, WORLD_SIZE);
 
                 // Еда
@@ -351,7 +442,7 @@
                     ctx.fillStyle = f.color; ctx.fill();
                 });
 
-                // Все игроки (включая нас)
+                // Все игроки
                 for (let id in otherPlayers) {
                     let p = otherPlayers[id];
                     if (!p.snake || p.snake.length === 0) continue;
@@ -410,8 +501,11 @@
 
                 ctx.restore();
 
-                // Миникарта
-                let radarSize = 130; let radarX = canvas.width - radarSize - 25; let radarY = canvas.height - radarSize - 25;
+                // РАДАР (МИНИКАРТА) ПЕРЕНЕСЕН В СЛЕВА СВЕРХУ ДЛЯ МОБИЛОК И ПК
+                let radarSize = isMobile ? 100 : 130; 
+                let radarX = 20; 
+                let radarY = 20;
+                
                 ctx.fillStyle = 'rgba(11, 12, 16, 0.85)'; ctx.strokeStyle = '#45a29e'; ctx.lineWidth = 2;
                 ctx.fillRect(radarX, radarY, radarSize, radarSize); ctx.strokeRect(radarX, radarY, radarSize, radarSize);
 
