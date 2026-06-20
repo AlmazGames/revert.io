@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Revert.io (Мобильная версия)</title>
+    <title>Revert.io (Оффлайн и Онлайн)</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; touch-action: none; }
         body, html { width: 100%; height: 100%; overflow: hidden; background-color: #0b0c10; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
@@ -31,16 +31,25 @@
             text-align: center; outline: none; margin-bottom: 25px; transition: 0.3s;
         }
         #nickname:focus { border-color: #66fcf1; box-shadow: 0 0 15px rgba(102, 252, 241, 0.4); }
+        
+        .menu-btn {
+            width: 280px; padding: 15px; font-size: 20px; font-weight: bold;
+            border: none; border-radius: 8px; cursor: pointer; transition: 0.2s ease-in-out;
+        }
         #play-btn {
-            width: 280px; padding: 15px; font-size: 22px; font-weight: bold;
-            background: #66fcf1; color: #0b0c10; border: none; border-radius: 8px;
-            cursor: pointer; transition: 0.2s ease-in-out; box-shadow: 0 0 15px #66fcf1;
+            background: #66fcf1; color: #0b0c10; box-shadow: 0 0 15px #66fcf1; margin-bottom: 15px;
         }
         #play-btn:hover:not(:disabled) { transform: scale(1.05); background: #fff; box-shadow: 0 0 25px #fff; }
-        #play-btn:disabled { background: #45a29e; color: #1f2833; cursor: not-allowed; box-shadow: none; opacity: 0.6; }
+        
+        #bots-btn {
+            background: #bd00ff; color: #fff; box-shadow: 0 0 15px #bd00ff;
+        }
+        #bots-btn:hover:not(:disabled) { transform: scale(1.05); background: #df80ff; box-shadow: 0 0 25px #df80ff; }
+        
+        .menu-btn:disabled { background: #45a29e; color: #1f2833; cursor: not-allowed; box-shadow: none; opacity: 0.6; }
+        
         #game-canvas { display: none; width: 100%; height: 100%; background: #0c0f12; }
         
-        /* СЧЕТЧИК МАССЫ (Сдвинут чуть ниже, чтобы на телефонах не пересекаться с радаром) */
         #mass-counter {
             display: none; position: absolute; top: 160px; left: 20px; z-index: 5;
             color: #66fcf1; font-size: 24px; font-weight: bold;
@@ -48,7 +57,7 @@
         }
         @media (max-width: 768px) { #mass-counter { top: 145px; font-size: 20px; left: 15px; } }
 
-        /* ЭЛЕМЕНТЫ УПРАВЛЕНИЯ ДЛЯ СМАРТФОНОВ */
+        /* МОБИЛЬНЫЙ ДЖОЙСТИК */
         #mobile-joystick-zone {
             display: none; position: absolute; bottom: 40px; left: 40px;
             width: 140px; height: 140px; background: rgba(31, 40, 51, 0.3);
@@ -61,6 +70,7 @@
             position: absolute; pointer-events: none;
         }
         
+        /* МОБИЛЬНЫЕ КНОПКИ */
         #mobile-buttons-zone {
             display: none; position: absolute; bottom: 40px; right: 40px;
             gap: 20px; flex-direction: column; align-items: center; z-index: 6;
@@ -82,7 +92,6 @@
             border-radius: 50%; font-size: 20px; font-weight: bold; color: #ff0055; display: none;
         }
 
-        /* ПОДСКАЗКА КЛАВИШИ НА ПК */
         .pc-hint { margin-top: 4px; color: #888; font-size: 11px; font-weight: bold; text-shadow: 0 2px 4px #000; }
         @media (max-width: 768px) { .pc-hint { display: none; } }
 
@@ -108,7 +117,8 @@
         <h1 class="title">Revert.io</h1>
         <div id="tips">Загрузка подсказок...</div>
         <input type="text" id="nickname" placeholder="Nickname..." maxlength="14" value="Player">
-        <button id="play-btn">PLAY</button>
+        <button id="play-btn" class="menu-btn">PLAY MULTIPLAYER</button>
+        <button id="bots-btn" class="menu-btn">PLAY WITH BOTS</button>
     </div>
 
     <div id="mass-counter">MASS: 35</div>
@@ -139,12 +149,16 @@
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>
         (function() {
-            // Замени на URL своего сервера
-            const socket = io("https://revert-io-server.onrender.com");
+            // Подключение к серверу (для онлайн режима)
+            let socket = null;
+            try {
+                socket = io("https://revert-io-server.onrender.com", { autoConnect: false });
+            } catch(e) { console.log("Оффлайн-режим готов к работе."); }
 
             const menu = document.getElementById('main-menu');
             const tipsDiv = document.getElementById('tips');
             const playBtn = document.getElementById('play-btn');
+            const botsBtn = document.getElementById('bots-btn');
             const canvas = document.getElementById('game-canvas');
             const massCounterUI = document.getElementById('mass-counter');
             const leaderboardUI = document.getElementById('leaderboard');
@@ -152,7 +166,6 @@
             const nicknameInput = document.getElementById('nickname');
             const ctx = canvas.getContext('2d');
 
-            // Мобильные элементы UI
             const joystickZone = document.getElementById('mobile-joystick-zone');
             const joystickStick = document.getElementById('mobile-joystick-stick');
             const mobileButtonsZone = document.getElementById('mobile-buttons-zone');
@@ -161,10 +174,10 @@
             const cdTimerText = document.getElementById('mobile-cd-timer');
 
             const tips = [
-                "Используй Квантовый Переворот, чтобы превратить свой хвост в голову!",
+                "Используй Квантовый Переворот [T], чтобы превратить свой хвост в голову!",
                 "Зажми кнопку BOOST или Пробел для резкого ускорения.",
                 "Осторожно! Красная граница карты смертельно опасна!",
-                "Змейка продолжит ползти, даже если свернуть вкладку браузера."
+                "Режим с ботами работает полностью оффлайн без интернета!"
             ];
             let tipIndex = 0;
             setInterval(() => {
@@ -178,6 +191,7 @@
 
             const WORLD_SIZE = 4000;
             const maxSegmentRadius = 14;
+            const SEGMENT_SPACING = 9; 
 
             const SKINS = [
                 { name: "Кибер-Циан", head: ["#ffffff", "#66fcf1", "#1f9c94"], body: ["#a6fff6", "#45a29e", "#1f2833"], tail: ["#ffffff", "#ff0055", "#990033"] },
@@ -187,176 +201,154 @@
 
             let currentSkin = SKINS[0]; 
             let isPlaying = false;
+            let isOfflineMode = false; // Флаг режима игры
             let mouse = { x: 0, y: 0 };
-            let myId = null;
-
-            let foods = [];
-            let otherPlayers = {};
-            let particles = [];
-            let camera = { x: 0, y: 0 };
+            let targetAngle = 0;
             let isBoosting = false;
 
-            // Логика кулдауна
+            let foods = [];
+            let otherPlayers = {}; // В оффлайн режиме тут будут храниться локальные боты
+            let particles = [];
+            let camera = { x: 0, y: 0 };
+
             let isCooldown = false;
             let cdDuration = 40; 
             let cdRemaining = 0;
             let cdInterval;
 
-            // Флаг детекта мобильного устройства
             let isMobile = false;
-            function checkDevice() {
-                isMobile = ('onTouchStart' in window || navigator.maxTouchPoints > 0 || window.innerWidth <= 768);
-            }
+            function checkDevice() { isMobile = ('onTouchStart' in window || navigator.maxTouchPoints > 0 || window.innerWidth <= 768); }
 
-            // Переменные для виртуального джойстика
             let joystickActive = false;
             let joystickCenter = { x: 0, y: 0 };
             let joystickAngle = 0;
 
-            // СЕТЕВЫЕ СОБЫТИЯ
-            socket.on('connect', () => { myId = socket.id; });
-            socket.on('init_data', (data) => { foods = data.foods; otherPlayers = data.players; });
-            socket.on('spawned', (pData) => {
-                isPlaying = true;
-                camera.x = pData.x - canvas.width / 2;
-                camera.y = pData.y - canvas.height / 2;
-            });
-            socket.on('new_player', (p) => { otherPlayers[p.id] = p; });
-            socket.on('player_disconnected', (id) => { delete otherPlayers[id]; });
-            socket.on('food_update', (data) => {
-                const idx = foods.findIndex(f => f.id === data.eatenId);
-                if (idx !== -1) foods.splice(idx, 1);
-                foods.push(data.newFood);
-            });
-            socket.on('foods_spawned', (newFoods) => { foods = foods.concat(newFoods); });
-            socket.on('player_exploded', (data) => { createExplosion(data.x, data.y, data.color, 40); });
-            socket.on('player_died_notification', (id) => { if (id === socket.id) gameOver(); else delete otherPlayers[id]; });
-            socket.on('heartbeat', (serverPlayers) => {
-                otherPlayers = serverPlayers;
-                if (isPlaying && otherPlayers[socket.id]) {
-                    massCounterUI.innerText = `MASS: ${otherPlayers[socket.id].score}`;
-                }
-                updateLeaderboard();
-            });
+            // СЕТЕВЫЕ СОБЫТИЯ (РАБОТАЮТ ТОЛЬКО В ОНЛАЙНЕ)
+            if (socket) {
+                socket.on('init_data', (data) => { if(!isOfflineMode) { foods = data.foods; otherPlayers = data.players; } });
+                socket.on('spawned', (pData) => {
+                    if(isOfflineMode) return;
+                    isPlaying = true;
+                    camera.x = pData.x - canvas.width / 2;
+                    camera.y = pData.y - canvas.height / 2;
+                });
+                socket.on('new_player', (p) => { if(!isOfflineMode) otherPlayers[p.id] = p; });
+                socket.on('player_disconnected', (id) => { if(!isOfflineMode) delete otherPlayers[id]; });
+                socket.on('food_update', (data) => {
+                    if(isOfflineMode) return;
+                    const idx = foods.findIndex(f => f.id === data.eatenId);
+                    if (idx !== -1) foods.splice(idx, 1);
+                    foods.push(data.newFood);
+                });
+                socket.on('foods_spawned', (newFoods) => { if(!isOfflineMode) foods = foods.concat(newFoods); });
+                socket.on('player_exploded', (data) => { if(!isOfflineMode) createExplosion(data.x, data.y, data.color, 40); });
+                socket.on('player_died_notification', (id) => {
+                    if (isOfflineMode) return;
+                    if (id === socket.id) gameOver(); else delete otherPlayers[id];
+                });
+                socket.on('heartbeat', (serverPlayers) => {
+                    if (isOfflineMode) return;
+                    otherPlayers = serverPlayers;
+                    if (isPlaying && otherPlayers[socket.id]) {
+                        massCounterUI.innerText = `MASS: ${otherPlayers[socket.id].score}`;
+                    }
+                    updateLeaderboard();
+                });
+            }
 
-            // ИНПУТЫ ДЛЯ ПК (Мышь и Клавиатура)
-            window.addEventListener('mousemove', (e) => { if(!joystickActive) { mouse.x = e.clientX; mouse.y = e.clientY; } });
-            window.addEventListener('mousedown', (e) => { if (e.button === 0 && isPlaying && !isMobile) { isBoosting = true; sendInput(); } });
-            window.addEventListener('mouseup', (e) => { if (e.button === 0 && !isMobile) { isBoosting = false; sendInput(); } });
+            // УПРАВЛЕНИЕ ПК
+            window.addEventListener('mousemove', (e) => { if(!joystickActive) { mouse.x = e.clientX; mouse.y = e.clientY; updateAngle(); } });
+            window.addEventListener('mousedown', (e) => { if (e.button === 0 && isPlaying && !isMobile) { isBoosting = true; } });
+            window.addEventListener('mouseup', (e) => { if (e.button === 0 && !isMobile) { isBoosting = false; } });
             window.addEventListener('keydown', (e) => {
                 if (!isPlaying) return;
-                if (e.code === 'Space') { e.preventDefault(); isBoosting = true; sendInput(); }
+                if (e.code === 'Space') { e.preventDefault(); isBoosting = true; }
                 if (e.key.toLowerCase() === 't' || e.key.toLowerCase() === 'е') activateQuantumShift();
             });
-            window.addEventListener('keyup', (e) => { if (e.code === 'Space') { isBoosting = false; sendInput(); } });
+            window.addEventListener('keyup', (e) => { if (e.code === 'Space') { isBoosting = false; } });
 
-            // ОБРАБОТКА СЕНСОРНОГО ДЖОЙСТИКА (TOUCH EVENTS)
+            // МОБИЛЬНЫЙ ДЖОЙСТИК
             joystickZone.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                joystickActive = true;
+                e.preventDefault(); joystickActive = true;
                 const rect = joystickZone.getBoundingClientRect();
                 joystickCenter.x = rect.left + rect.width / 2;
                 joystickCenter.y = rect.top + rect.height / 2;
                 handleJoystickMove(e.targetTouches[0].clientX, e.targetTouches[0].clientY);
             });
-
             joystickZone.addEventListener('touchmove', (e) => {
-                e.preventDefault();
-                if (!joystickActive) return;
+                e.preventDefault(); if (!joystickActive) return;
                 handleJoystickMove(e.targetTouches[0].clientX, e.targetTouches[0].clientY);
             });
-
             joystickZone.addEventListener('touchend', (e) => {
-                e.preventDefault();
-                joystickActive = false;
+                e.preventDefault(); joystickActive = false;
                 joystickStick.style.transform = `translate(0px, 0px)`;
             });
 
             function handleJoystickMove(touchX, touchY) {
-                let dx = touchX - joystickCenter.x;
-                let dy = touchY - joystickCenter.y;
-                let dist = Math.sqrt(dx * dx + dy * dy);
-                let maxLen = 45; // Ограничение движения стика внутри кольца
-
+                let dx = touchX - joystickCenter.x; let dy = touchY - joystickCenter.y;
+                let dist = Math.sqrt(dx * dx + dy * dy); let maxLen = 45;
                 joystickAngle = Math.atan2(dy, dx);
-
-                if (dist > maxLen) {
-                    dx = Math.cos(joystickAngle) * maxLen;
-                    dy = Math.sin(joystickAngle) * maxLen;
-                }
-
+                if (dist > maxLen) { dx = Math.cos(joystickAngle) * maxLen; dy = Math.sin(joystickAngle) * maxLen; }
                 joystickStick.style.transform = `translate(${dx}px, ${dy}px)`;
-                sendInput();
+                targetAngle = joystickAngle;
             }
 
-            // МОБИЛЬНЫЕ КНОПКИ (Ускорение и переворот)
-            boostBtn.addEventListener('touchstart', (e) => { e.preventDefault(); isBoosting = true; boostBtn.classList.add('active'); sendInput(); });
-            boostBtn.addEventListener('touchend', (e) => { e.preventDefault(); isBoosting = false; boostBtn.classList.remove('active'); sendInput(); });
+            function updateAngle() {
+                if (isMobile || !isPlaying || !otherPlayers['player']) return;
+                let me = otherPlayers['player'];
+                let headScreenX = me.x - camera.x; let headScreenY = me.y - camera.y;
+                targetAngle = Math.atan2(mouse.y - headScreenY, mouse.x - headScreenX);
+            }
+
+            boostBtn.addEventListener('touchstart', (e) => { e.preventDefault(); isBoosting = true; boostBtn.classList.add('active'); });
+            boostBtn.addEventListener('touchend', (e) => { e.preventDefault(); isBoosting = false; boostBtn.classList.remove('active'); });
             shiftBtn.addEventListener('touchstart', (e) => { e.preventDefault(); activateQuantumShift(); });
 
-            function sendInput() {
-                if (!isPlaying || !otherPlayers[socket.id]) return;
-                let targetAngle = 0;
-
-                if (isMobile && joystickActive) {
-                    // На мобилках берем угол напрямую с джойстика
-                    targetAngle = joystickAngle;
-                } else {
-                    // На ПК считаем угол относительно центра экрана к курсору мыши
-                    let me = otherPlayers[socket.id];
-                    let headScreenX = me.x - camera.x;
-                    let headScreenY = me.y - camera.y;
-                    targetAngle = Math.atan2(mouse.y - headScreenY, mouse.x - headScreenX);
+            // ОТПРАВКА СЕТЕВОГО ИНПУТА В ОНЛАЙНЕ
+            setInterval(() => {
+                if (isPlaying && !isOfflineMode && socket && socket.connected) {
+                    socket.emit('update_input', { targetAngle: targetAngle, isBoosting: isBoosting });
                 }
-                
-                socket.emit('update_input', { targetAngle: targetAngle, isBoosting: isBoosting });
-            }
+            }, 50);
 
-            // Отправляем пакеты ввода на сервер с интервалом в 50мс
-            setInterval(sendInput, 50);
-
+            // ЗАПУСК МУЛЬТИПЛЕЕРА
             playBtn.addEventListener('click', () => {
-                if (playBtn.disabled) return;
-                playBtn.disabled = true;
-
+                if (!socket) return alert("Сетевой модуль недоступен.");
+                isOfflineMode = false;
+                socket.connect();
                 let pName = nicknameInput.value.trim() || "Player";
+                enterGameVisibility();
+                currentSkin = SKINS[Math.floor(Math.random() * SKINS.length)];
+                socket.emit('init_player', { name: pName, skin: currentSkin });
+            });
+
+            // ЗАПУСК ОФФЛАЙН РЕЖИМА С БОТАМИ
+            botsBtn.addEventListener('click', () => {
+                isOfflineMode = true;
+                let pName = nicknameInput.value.trim() || "Player";
+                enterGameVisibility();
+                initOfflineEngine(pName);
+            });
+
+            function enterGameVisibility() {
                 menu.style.opacity = 0;
                 setTimeout(() => {
-                    menu.style.display = 'none';
-                    canvas.style.display = 'block';
-                    massCounterUI.style.display = 'block';
-                    leaderboardUI.style.display = 'block';
-                    
+                    menu.style.display = 'none'; canvas.style.display = 'block';
+                    massCounterUI.style.display = 'block'; leaderboardUI.style.display = 'block';
                     checkDevice();
-                    if (isMobile) {
-                        joystickZone.style.display = 'flex';
-                        mobileButtonsZone.style.display = 'flex';
-                    } else {
-                        // На ПК выводим блок кнопок справа только ради подсказки хоткеев
-                        mobileButtonsZone.style.display = 'flex';
-                    }
-                    
-                    currentSkin = SKINS[Math.floor(Math.random() * SKINS.length)];
+                    joystickZone.style.display = isMobile ? 'flex' : 'none';
+                    mobileButtonsZone.style.display = 'flex';
                     resizeCanvas();
-                    
                     if(cdInterval) clearInterval(cdInterval);
-                    isCooldown = false;
-                    shiftBtn.classList.remove('cooldown');
-                    cdTimerText.style.display = 'none';
-
-                    socket.emit('init_player', { name: pName, skin: currentSkin });
-                    playBtn.disabled = false;
+                    isCooldown = false; shiftBtn.classList.remove('cooldown'); cdTimerText.style.display = 'none';
                 }, 500);
-            });
+            }
 
             function gameOver() {
                 isPlaying = false;
-                canvas.style.display = 'none';
-                joystickZone.style.display = 'none';
-                mobileButtonsZone.style.display = 'none';
-                massCounterUI.style.display = 'none';
-                leaderboardUI.style.display = 'none';
-                menu.style.display = 'flex';
+                if(!isOfflineMode && socket) socket.disconnect();
+                canvas.style.display = 'none'; joystickZone.style.display = 'none'; mobileButtonsZone.style.display = 'none';
+                massCounterUI.style.display = 'none'; leaderboardUI.style.display = 'none'; menu.style.display = 'flex';
                 setTimeout(() => { menu.style.opacity = 1; }, 50);
             }
 
@@ -365,49 +357,237 @@
 
             function activateQuantumShift() {
                 if (isCooldown || !isPlaying) return;
-                socket.emit('quantum_shift');
-
-                isCooldown = true;
-                cdRemaining = cdDuration;
-                shiftBtn.classList.add('cooldown');
-                cdTimerText.style.display = 'flex';
-                cdTimerText.innerText = cdRemaining;
-
-                cdInterval = setInterval(() => {
-                    cdRemaining--;
-                    cdTimerText.innerText = cdRemaining;
-                    if (cdRemaining <= 0) {
-                        clearInterval(cdInterval);
-                        isCooldown = false;
-                        shiftBtn.classList.remove('cooldown');
-                        cdTimerText.style.display = 'none';
+                
+                if (isOfflineMode) {
+                    // Оффлайн логика разворота
+                    let me = otherPlayers['player'];
+                    if(me && me.snake.length > 1) {
+                        me.snake.reverse();
+                        me.x = me.snake[0].x; me.y = me.snake[0].y;
+                        let dx = me.snake[0].x - me.snake[1].x;
+                        let dy = me.snake[0].y - me.snake[1].y;
+                        me.angle = Math.atan2(dy, dx); targetAngle = me.angle;
                     }
+                } else {
+                    if(socket) socket.emit('quantum_shift');
+                }
+
+                isCooldown = true; cdRemaining = cdDuration;
+                shiftBtn.classList.add('cooldown'); cdTimerText.style.display = 'flex'; cdTimerText.innerText = cdRemaining;
+                cdInterval = setInterval(() => {
+                    cdRemaining--; cdTimerText.innerText = cdRemaining;
+                    if (cdRemaining <= 0) { clearInterval(cdInterval); isCooldown = false; shiftBtn.classList.remove('cooldown'); cdTimerText.style.display = 'none'; }
                 }, 1000);
+            }
+
+            // ==========================================
+            // ЛОКАЛЬНЫЙ ОФФЛАЙН ДВИЖОК ДЛЯ ИГРЫ БЕЗ ИНЕТА
+            // ==========================================
+            function initOfflineEngine(playerName) {
+                foods = []; otherPlayers = {}; particles = [];
+                currentSkin = SKINS[Math.floor(Math.random() * SKINS.length)];
+
+                // Создаем еду
+                for (let i = 0; i < 400; i++) foods.push(createOfflineFood());
+
+                // Инициализируем игрока
+                otherPlayers['player'] = {
+                    id: 'player', name: playerName, x: WORLD_SIZE/2, y: WORLD_SIZE/2,
+                    angle: 0, score: 35, skin: currentSkin,
+                    snake: Array.from({length: 15}, (_, i) => ({x: WORLD_SIZE/2 - i*SEGMENT_SPACING, y: WORLD_SIZE/2}))
+                };
+
+                // Создаем 15 ботов
+                for (let i = 0; i < 15; i++) {
+                    let botId = 'bot_' + i;
+                    let bx = Math.random() * (WORLD_SIZE - 400) + 200;
+                    let by = Math.random() * (WORLD_SIZE - 400) + 200;
+                    let bSkin = SKINS[Math.floor(Math.random() * SKINS.length)];
+                    otherPlayers[botId] = {
+                        id: botId, name: "IvyBot " + (i+1), x: bx, y: by,
+                        angle: Math.random() * Math.PI * 2, score: Math.floor(Math.random() * 50) + 30,
+                        skin: bSkin, isBot: true, botTurnTimer: 0,
+                        snake: Array.from({length: 12}, (_, k) => ({x: bx - k*SEGMENT_SPACING, y: by}))
+                    };
+                }
+
+                isPlaying = true;
+                camera.x = otherPlayers['player'].x - canvas.width / 2;
+                camera.y = otherPlayers['player'].y - canvas.height / 2;
+            }
+
+            function createOfflineFood() {
+                return {
+                    id: Math.random(),
+                    x: Math.random() * (WORLD_SIZE - 40) + 20,
+                    y: Math.random() * (WORLD_SIZE - 40) + 20,
+                    radius: Math.random() * 3 + 3,
+                    color: `hsl(${Math.random() * 360}, 100%, 60%)`
+                };
+            }
+
+            function updateOfflineLogic() {
+                if (!isPlaying || !isOfflineMode) return;
+
+                // 1. Движение игрока
+                let me = otherPlayers['player'];
+                if (me) {
+                    // Плавный поворот (физика с постоянным радиусом)
+                    let angleDiff = targetAngle - me.angle;
+                    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+                    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+                    me.angle += angleDiff * 0.12;
+
+                    let speed = isBoosting && me.score > 15 ? 4.5 : 2.5;
+                    if(isBoosting && me.score > 15 && Math.random() < 0.15) {
+                        me.score--;
+                        foods.push({ id: Math.random(), x: me.snake[me.snake.length-1].x, y: me.snake[me.snake.length-1].y, radius: 3, color: me.skin.body[1] });
+                    }
+
+                    me.x += Math.cos(me.angle) * speed;
+                    me.y += Math.sin(me.angle) * speed;
+                    
+                    // Обновление хвоста
+                    updateSnakeSegments(me);
+
+                    // Проверка выхода за границы
+                    if (me.x < 0 || me.x > WORLD_SIZE || me.y < 0 || me.y > WORLD_SIZE) {
+                        createExplosion(me.x, me.y, me.skin.head[1], 40);
+                        gameOver(); return;
+                    }
+                }
+
+                // 2. Движение и логика ботов
+                for (let id in otherPlayers) {
+                    let p = otherPlayers[id];
+                    if (!p.isBot) continue;
+
+                    p.botTurnTimer--;
+                    if(p.botTurnTimer <= 0) {
+                        p.angle = Math.random() * Math.PI * 2;
+                        p.botTurnTimer = Math.random() * 80 + 40;
+                    }
+
+                    let bSpeed = 2.2;
+                    p.x += Math.cos(p.angle) * bSpeed;
+                    p.y += Math.sin(p.angle) * bSpeed;
+
+                    // Отскок бота от стен, чтобы они не вымирали сразу
+                    if (p.x < 100) p.angle = 0; if (p.x > WORLD_SIZE - 100) p.angle = Math.PI;
+                    if (p.y < 100) p.angle = Math.PI/2; if (p.y > WORLD_SIZE - 100) p.angle = -Math.PI/2;
+
+                    updateSnakeSegments(p);
+                }
+
+                // 3. Поедание еды (оффлайн)
+                for (let id in otherPlayers) {
+                    let p = otherPlayers[id];
+                    for (let i = foods.length - 1; i >= 0; i--) {
+                        let f = foods[i];
+                        let dx = p.x - f.x; let dy = p.y - f.y;
+                        if (dx*dx + dy*dy < (maxSegmentRadius + f.radius) * (maxSegmentRadius + f.radius)) {
+                            foods.splice(i, 1);
+                            p.score += Math.floor(f.radius / 2);
+                            foods.push(createOfflineFood());
+                        }
+                    }
+                }
+
+                // 4. Проверка столкновений (убийства змеек)
+                let deadBots = [];
+                for (let idA in otherPlayers) {
+                    let pA = otherPlayers[idA]; // Кто может врезаться головой
+
+                    for (let idB in otherPlayers) {
+                        let pB = otherPlayers[idB]; // В чей хвост врезаются
+                        if (idA === idB) continue;
+
+                        // Перебираем сегменты тела игрока B (кроме самой головы)
+                        for (let j = 1; j < pB.snake.length; j++) {
+                            let seg = pB.snake[j];
+                            let dx = pA.x - seg.x; let dy = pA.y - seg.y;
+                            if (dx*dx + dy*dy < (maxSegmentRadius * 1.5) * (maxSegmentRadius * 1.5)) {
+                                createExplosion(pA.x, pA.y, pA.skin.head[1], 30);
+                                
+                                // Превращаем погибшего в еду
+                                pA.snake.forEach(s => {
+                                    if(Math.random() < 0.4) foods.push({ id: Math.random(), x: s.x + (Math.random()*10-5), y: s.y + (Math.random()*10-5), radius: 4, color: pA.skin.body[1] });
+                                });
+
+                                if (idA === 'player') { gameOver(); return; } 
+                                else { deadBots.push(idA); pB.score += 15; }
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Удаляем мертвых ботов и спавним новых
+                deadBots.forEach(id => {
+                    delete otherPlayers[id];
+                    // Спавним нового бота взамен
+                    let botId = 'bot_' + Math.random();
+                    let bx = Math.random() * (WORLD_SIZE - 400) + 200; let by = Math.random() * (WORLD_SIZE - 400) + 200;
+                    otherPlayers[botId] = {
+                        id: botId, name: "NeonBot " + Math.floor(Math.random()*100), x: bx, y: by,
+                        angle: Math.random() * Math.PI * 2, score: 35, skin: SKINS[Math.floor(Math.random()*SKINS.length)],
+                        isBot: true, botTurnTimer: 60, snake: Array.from({length: 12}, (_, k) => ({x: bx - k*SEGMENT_SPACING, y: by}))
+                    };
+                });
+
+                // Обновляем текст массы локально
+                if(otherPlayers['player']) massCounterUI.innerText = `MASS: ${otherPlayers['player'].score}`;
+                updateLeaderboard();
+            }
+
+            function updateSnakeSegments(p) {
+                // Расчет длины на основе очков змейки
+                let targetLength = Math.floor(p.score / 2) + 4;
+                if(targetLength < 10) targetLength = 10;
+
+                let head = p.snake[0];
+                head.x = p.x; head.y = p.y; head.angle = p.angle;
+
+                for (let i = 1; i < p.snake.length; i++) {
+                    let cur = p.snake[i]; let prev = p.snake[i-1];
+                    let dx = cur.x - prev.x; let dy = cur.y - prev.y;
+                    let len = Math.sqrt(dx*dx + dy*dy);
+                    if (len > SEGMENT_SPACING) {
+                        let angle = Math.atan2(dy, dx);
+                        cur.x = prev.x + Math.cos(angle) * SEGMENT_SPACING;
+                        cur.y = prev.y + Math.sin(angle) * SEGMENT_SPACING;
+                    }
+                }
+
+                while(p.snake.length < targetLength) {
+                    let last = p.snake[p.snake.length-1];
+                    p.snake.push({x: last.x, y: last.y});
+                }
+                while(p.snake.length > targetLength) {
+                    p.snake.pop();
+                }
             }
 
             function createExplosion(x, y, color, count = 20) {
                 for (let i = 0; i < count; i++) {
-                    let angle = Math.random() * Math.PI * 2;
-                    let speed = Math.random() * 5 + 2;
+                    let angle = Math.random() * Math.PI * 2; let speed = Math.random() * 5 + 2;
                     particles.push({
-                        x: x, y: y,
-                        vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
-                        radius: Math.random() * 4 + 2, color: color, alpha: 1,
-                        decay: Math.random() * 0.03 + 0.015
+                        x: x, y: y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+                        radius: Math.random() * 4 + 2, color: color, alpha: 1, decay: Math.random() * 0.03 + 0.015
                     });
                 }
             }
 
             function updateVisuals() {
                 for (let i = particles.length - 1; i >= 0; i--) {
-                    let p = particles[i];
-                    p.x += p.vx; p.y += p.vy; p.alpha -= p.decay;
+                    let p = particles[i]; p.x += p.vx; p.y += p.vy; p.alpha -= p.decay;
                     if (p.alpha <= 0) particles.splice(i, 1);
                 }
-                if (isPlaying && otherPlayers[socket.id]) {
-                    let me = otherPlayers[socket.id];
-                    camera.x += (me.x - canvas.width / 2 - camera.x) * 0.08;
-                    camera.y += (me.y - canvas.height / 2 - camera.y) * 0.08;
+                
+                let targetNode = isOfflineMode ? otherPlayers['player'] : otherPlayers[socket.id];
+                if (isPlaying && targetNode) {
+                    camera.x += (targetNode.x - canvas.width / 2 - camera.x) * 0.08;
+                    camera.y += (targetNode.y - canvas.height / 2 - camera.y) * 0.08;
                 }
             }
 
@@ -415,9 +595,11 @@
                 let allPlayers = Object.values(otherPlayers);
                 allPlayers.sort((a, b) => b.score - a.score);
                 leaderList.innerHTML = "";
+                
+                let currentId = isOfflineMode ? 'player' : (socket ? socket.id : null);
                 allPlayers.slice(0, 10).forEach((p, index) => {
                     let item = document.createElement('div');
-                    item.className = (p.id === socket.id) ? 'leader-item player' : 'leader-item';
+                    item.className = (p.id === currentId) ? 'leader-item player' : 'leader-item';
                     item.innerHTML = `<span>${index + 1}. ${p.name}</span><span>${p.score}</span>`;
                     leaderList.appendChild(item);
                 });
@@ -425,31 +607,26 @@
 
             function draw() {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.save();
-                ctx.translate(-camera.x, -camera.y);
+                ctx.save(); ctx.translate(-camera.x, -camera.y);
 
                 // Сетка
                 ctx.strokeStyle = '#11161d'; ctx.lineWidth = 1;
                 for (let x = 0; x <= WORLD_SIZE; x += 60) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, WORLD_SIZE); ctx.stroke(); }
                 for (let y = 0; y <= WORLD_SIZE; y += 60) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WORLD_SIZE, y); ctx.stroke(); }
 
-                // Граница карты
+                // Граница
                 ctx.strokeStyle = '#ff0055'; ctx.lineWidth = 5; ctx.strokeRect(0, 0, WORLD_SIZE, WORLD_SIZE);
 
                 // Еда
-                foods.forEach(f => {
-                    ctx.beginPath(); ctx.arc(f.x, f.y, f.radius, 0, Math.PI * 2);
-                    ctx.fillStyle = f.color; ctx.fill();
-                });
+                foods.forEach(f => { ctx.beginPath(); ctx.arc(f.x, f.y, f.radius, 0, Math.PI * 2); ctx.fillStyle = f.color; ctx.fill(); });
 
-                // Все игроки
+                // Змейки
                 for (let id in otherPlayers) {
                     let p = otherPlayers[id];
                     if (!p.snake || p.snake.length === 0) continue;
 
                     for (let i = p.snake.length - 1; i >= 0; i--) {
-                        let seg = p.snake[i];
-                        let r = maxSegmentRadius;
+                        let seg = p.snake[i]; let r = maxSegmentRadius;
                         if (i > p.snake.length * 0.75) {
                             r = maxSegmentRadius * (1 - ((i - p.snake.length * 0.75) / (p.snake.length * 0.25)) * 0.15); 
                         }
@@ -460,8 +637,7 @@
 
                         if (i === 0) {
                             gradient.addColorStop(0, skin.head[0]); gradient.addColorStop(0.2, skin.head[1]); gradient.addColorStop(1, skin.head[2]);
-                            if (p.spawnProtection > 0) ctx.globalAlpha = 0.5;
-                            else { ctx.shadowBlur = 15; ctx.shadowColor = skin.head[1]; }
+                            if (p.spawnProtection > 0) ctx.globalAlpha = 0.5; else { ctx.shadowBlur = 15; ctx.shadowColor = skin.head[1]; }
                         } else if (i === p.snake.length - 1) {
                             gradient.addColorStop(0, skin.tail[0]); gradient.addColorStop(0.2, skin.tail[1]); gradient.addColorStop(1, skin.tail[2]);
                         } else {
@@ -471,7 +647,7 @@
                         ctx.fillStyle = gradient; ctx.fill(); ctx.closePath(); ctx.shadowBlur = 0;
 
                         if (i === 0) {
-                            let headAngle = seg.angle;
+                            let headAngle = seg.angle || p.angle;
                             let leftEyeX = seg.x + Math.cos(headAngle - 0.6) * r * 0.5;
                             let leftEyeY = seg.y + Math.sin(headAngle - 0.6) * r * 0.5;
                             let rightEyeX = seg.x + Math.cos(headAngle + 0.6) * r * 0.5;
@@ -485,7 +661,8 @@
                             ctx.beginPath(); ctx.arc(leftEyeX + Math.cos(headAngle)*2, leftEyeY + Math.sin(headAngle)*2, r * 0.18, 0, Math.PI * 2); ctx.fill();
                             ctx.beginPath(); ctx.arc(rightEyeX + Math.cos(headAngle)*2, rightEyeY + Math.sin(headAngle)*2, r * 0.18, 0, Math.PI * 2); ctx.fill();
 
-                            ctx.fillStyle = (id === socket.id) ? '#66fcf1' : '#ffffff'; ctx.font = 'bold 14px Segoe UI'; ctx.textAlign = 'center';
+                            let currentId = isOfflineMode ? 'player' : (socket ? socket.id : null);
+                            ctx.fillStyle = (id === currentId) ? '#66fcf1' : '#ffffff'; ctx.font = 'bold 14px Segoe UI'; ctx.textAlign = 'center';
                             ctx.shadowColor = '#000000'; ctx.shadowBlur = 4;
                             ctx.fillText(p.name, seg.x, seg.y - r - 8); ctx.shadowBlur = 0;
                             ctx.globalAlpha = 1.0;
@@ -493,30 +670,28 @@
                     }
                 }
 
-                // Эффекты взрывов
+                // Частицы
                 particles.forEach(p => {
                     ctx.save(); ctx.globalAlpha = p.alpha; ctx.fillStyle = p.color;
                     ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.fill(); ctx.restore();
                 });
-
                 ctx.restore();
 
-                // РАДАР (МИНИКАРТА) ПЕРЕНЕСЕН В СЛЕВА СВЕРХУ ДЛЯ МОБИЛОК И ПК
-                let radarSize = isMobile ? 100 : 130; 
-                let radarX = 20; 
-                let radarY = 20;
-                
+                // РАДАР СЛЕВА СВЕРХУ
+                let radarSize = isMobile ? 100 : 130; let radarX = 20; let radarY = 20;
                 ctx.fillStyle = 'rgba(11, 12, 16, 0.85)'; ctx.strokeStyle = '#45a29e'; ctx.lineWidth = 2;
                 ctx.fillRect(radarX, radarY, radarSize, radarSize); ctx.strokeRect(radarX, radarY, radarSize, radarSize);
 
+                let currentId = isOfflineMode ? 'player' : (socket ? socket.id : null);
                 for (let id in otherPlayers) {
                     let op = otherPlayers[id];
                     ctx.fillStyle = (op.skin) ? op.skin.head[1] : '#66fcf1';
-                    ctx.beginPath(); ctx.arc(radarX + (op.x / WORLD_SIZE) * radarSize, radarY + (op.y / WORLD_SIZE) * radarSize, (id === socket.id)? 4: 3.5, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(radarX + (op.x / WORLD_SIZE) * radarSize, radarY + (op.y / WORLD_SIZE) * radarSize, (id === currentId)? 4: 3.5, 0, Math.PI * 2); ctx.fill();
                 }
             }
 
             function gameLoop() {
+                if(isOfflineMode) updateOfflineLogic();
                 updateVisuals();
                 draw();
                 requestAnimationFrame(gameLoop);
