@@ -222,13 +222,17 @@
             let mouse = { x: 0, y: 0 };
             let targetAngle = -Math.PI / 2;
             let isBoosting = false;
-            let snake = [];
+            
+            // ПЕРЕМЕННЫЕ ДЛЯ СМУТИНГА (ИНТЕРПОЛЯЦИИ)
+            let snake = [];              // Локальный сглаженный массив нашей змейки (60+ FPS)
+            let myServerSnake = [];      // Последняя «цель» нашей змейки, прилетевшая от сервера (20 FPS)
+            let otherPlayers = {};       // Постоянное хранилище врагов (вместо полной очистки)
+
             let score = 35;
             let playerName = "Player";
             let spawnProtection = 0;
 
             let foods = [];
-            let otherPlayers = {}; 
             let particles = [];
             let camera = { x: 0, y: 0 };
 
@@ -250,7 +254,8 @@
                 
                 socket.on('spawned', (pData) => {
                     if(isOfflineMode) return;
-                    snake = pData.snake;
+                    snake = JSON.parse(JSON.stringify(pData.snake)); // Копируем стартовый массив
+                    myServerSnake = pData.snake;                    // Устанавливаем цель
                     score = pData.score;
                     spawnProtection = pData.spawnProtection;
                     camera.x = pData.x - canvas.width / 2;
@@ -274,21 +279,46 @@
                     if (id === socket.id) gameOver();
                 });
 
+                // [СГЛАЖИВАНИЕ]: Сохраняем входящие данные как ориентир для смутинга
                 socket.on('heartbeat', (serverPlayers) => {
                     if (isOfflineMode || !isPlaying) return;
                     
-                    otherPlayers = {};
                     for (let id in serverPlayers) {
+                        let sp = serverPlayers[id];
+                        
                         if (id === socket.id) {
-                            score = serverPlayers[id].score;
-                            snake = serverPlayers[id].snake;
-                            spawnProtection = serverPlayers[id].spawnProtection;
+                            score = sp.score;
+                            myServerSnake = sp.snake; // Серверный массив — это цель
+                            spawnProtection = sp.spawnProtection;
                             massCounterUI.innerText = `MASS: ${score}`;
                         } else {
-                            otherPlayers[id] = serverPlayers[id];
+                            // Если игрока еще нет локально — создаем его с полной копией структуры
+                            if (!otherPlayers[id]) {
+                                otherPlayers[id] = {
+                                    id: sp.id,
+                                    name: sp.name,
+                                    skin: sp.skin,
+                                    spawnProtection: sp.spawnProtection,
+                                    score: sp.score,
+                                    snake: JSON.parse(JSON.stringify(sp.snake)), // Локальная плавная змейка
+                                    serverSnake: sp.snake // Серверная цель
+                                };
+                            } else {
+                                // Если есть, просто обновляем метаданные и новую серверную цель
+                                otherPlayers[id].score = sp.score;
+                                otherPlayers[id].spawnProtection = sp.spawnProtection;
+                                otherPlayers[id].serverSnake = sp.snake;
+                            }
                         }
                     }
-                    // [ИЗМЕНЕНО] Убрано мгновенное обновление лидерборда отсюда, чтобы снизить лаги DOM.
+                    
+                    // Удаляем игроков, которые отключились или взорвались на сервере
+                    for (let id in otherPlayers) {
+                        if (!serverPlayers[id]) {
+                            delete otherPlayers[id];
+                        }
+                    }
+                    updateLeaderboard();
                 });
             }
 
@@ -306,7 +336,7 @@
             });
             window.addEventListener('keyup', (e) => { if (e.code === 'Space') { isBoosting = false; } });
 
-            // МОБИЛЬНЫЙ ДЖОЙСТИК И КНОПКИ
+            // МОБИЛЬНЫЙ ДЖОЙСТИК
             joystickZone.addEventListener('touchstart', (e) => {
                 e.preventDefault(); joystickActive = true;
                 const rect = joystickZone.getBoundingClientRect();
@@ -343,7 +373,7 @@
             mobileShiftBtn.addEventListener('touchstart', (e) => { e.preventDefault(); activateQuantumShift(); });
             skillBtn.addEventListener('click', () => { if(!isMobile) activateQuantumShift(); });
 
-            // СЕТЕВОЙ ТИК ДЛЯ ОТПРАВКИ ИНПУТОВ НА СЕРВЕР (20 раз в секунду)
+            // Сетевой инпут
             setInterval(() => {
                 if (isPlaying && !isOfflineMode && socket && socket.connected) {
                     socket.emit('update_input', { targetAngle: targetAngle, isBoosting: isBoosting });
@@ -352,7 +382,7 @@
 
             // КНОПКИ СТАРТА
             playBtn.addEventListener('click', () => {
-                if (!socket) return alert("Серверная библиотека не загружена.");
+                if (!socket) return alert("Серверная библиотека не загружены.");
                 isOfflineMode = false;
                 playerName = nicknameInput.value.trim() || "Player";
                 playBtn.disabled = true;
@@ -443,6 +473,81 @@
                 }, 1000);
             }
 
+
+            // ==========================================
+            // [НОВОЕ] ФУНКЦИЯ ОНЛАЙН ИНТЕРПОЛЯЦИИ (60+ FPS СМУТИНГ)
+            // ==========================================
+            function updateOnlineInterpolation(dtMs) {
+                // Коэффициент плавности, адаптированный под текущий FPS (примерно 0.30 при 60 FPS)
+                let lerpFactor = 0.32 * (dtMs / 16.67);
+                if (lerpFactor > 1) lerpFactor = 1;
+
+                // 1. Сглаживаем НАШУ собственную змейку к её серверной копии
+                if (snake && snake.length > 0 && myServerSnake && myServerSnake.length > 0) {
+                    // Синхронизируем длину локального массива
+                    while (snake.length < myServerSnake.length) {
+                        let last = snake[snake.length - 1] || { x: myServerSnake[0].x, y: myServerSnake[0].y, angle: myServerSnake[0].angle };
+                        snake.push({ x: last.x, y: last.y, angle: last.angle });
+                    }
+                    while (snake.length > myServerSnake.length) {
+                        snake.pop();
+                    }
+
+                    // Линейно двигаем каждый сегмент к его серверной точке назначения
+                    for (let i = 0; i < snake.length; i++) {
+                        let localSeg = snake[i];
+                        let serverSeg = myServerSnake[i];
+                        if (!serverSeg) continue;
+
+                        localSeg.x += (serverSeg.x - localSeg.x) * lerpFactor;
+                        localSeg.y += (serverSeg.y - localSeg.y) * lerpFactor;
+
+                        // Сглаживание угла с учётом перехода через границу PI / -PI
+                        let diff = serverSeg.angle - localSeg.angle;
+                        while (diff < -Math.PI) diff += Math.PI * 2;
+                        while (diff > Math.PI) diff -= Math.PI * 2;
+                        localSeg.angle += diff * lerpFactor;
+                    }
+                }
+
+                // 2. Сглаживаем всех ОСТАЛЬНЫХ игроков на карте
+                for (let id in otherPlayers) {
+                    let p = otherPlayers[id];
+                    if (isOfflineMode || !p.serverSnake || p.serverSnake.length === 0) continue;
+
+                    // Синхронизируем длину массива врага
+                    while (p.snake.length < p.serverSnake.length) {
+                        let last = p.snake[p.snake.length - 1] || { x: p.serverSnake[0].x, y: p.serverSnake[0].y, angle: p.serverSnake[0].angle };
+                        p.snake.push({ x: last.x, y: last.y, angle: last.angle });
+                    }
+                    while (p.snake.length > p.serverSnake.length) {
+                        p.snake.pop();
+                    }
+
+                    // Интерполируем сегменты врага
+                    for (let i = 0; i < p.snake.length; i++) {
+                        let localSeg = p.snake[i];
+                        let serverSeg = p.serverSnake[i];
+                        if (!serverSeg) continue;
+
+                        localSeg.x += (serverSeg.x - localSeg.x) * lerpFactor;
+                        localSeg.y += (serverSeg.y - localSeg.y) * lerpFactor;
+
+                        let diff = serverSeg.angle - localSeg.angle;
+                        while (diff < -Math.PI) diff += Math.PI * 2;
+                        while (diff > Math.PI) diff -= Math.PI * 2;
+                        localSeg.angle += diff * lerpFactor;
+                    }
+
+                    // Обновляем общие координаты x и y головы (для корректного отображения на радаре)
+                    if (p.snake.length > 0) {
+                        p.x = p.snake[0].x;
+                        p.y = p.snake[0].y;
+                    }
+                }
+            }
+
+
             // ==========================================
             // ЛОКАЛЬНЫЙ ОФФЛАЙН ДВИЖОК С БОТАМИ
             // ==========================================
@@ -486,9 +591,6 @@
                 isPlaying = true;
                 camera.x = otherPlayers['player'].x - canvas.width / 2;
                 camera.y = otherPlayers['player'].y - canvas.height / 2;
-                
-                // Сразу принудительно обновим лидерборд при старте
-                updateLeaderboard();
             }
 
             function createOfflineFood() {
@@ -630,7 +732,7 @@
                 });
 
                 if(otherPlayers['player']) massCounterUI.innerText = `MASS: ${otherPlayers['player'].score}`;
-                // [ИЗМЕНЕНО] Удален ежекадровый вызов updateLeaderboard(); для оффлайна
+                updateLeaderboard();
             }
 
             function updateSnakeSegments(p) {
@@ -665,10 +767,48 @@
                 }
             }
 
-            // [ИЗМЕНЕНО] ФУНКЦИЯ ОБНОВЛЕНИЯ ЛИДЕРБОРДА (РАЗ В 2 СЕКУНДЫ)
+            // ИГРОВОЙ ЦИКЛ ОБНОВЛЕНИЯ И ОТРИСОВКИ
+            let lastTime = performance.now();
+            function gameLoop(timestamp) {
+                let dt = timestamp - lastTime;
+                if (dt > 100 || isNaN(dt)) dt = 16.67; 
+                lastTime = timestamp;
+
+                if (isPlaying) {
+                    if (isOfflineMode) {
+                        updateOfflineLogic(dt);
+                    } else {
+                        // [ВКЛЮЧАЕМ ИНТЕРПОЛЯЦИЮ]: Сглаживаем сетевые координаты онлайн-игроков каждую секунду
+                        updateOnlineInterpolation(dt);
+
+                        // Рассчитываем затухание эффектов локально в онлайне
+                        for (let i = particles.length - 1; i >= 0; i--) {
+                            let p = particles[i]; p.x += p.vx * (dt / 16.67); p.y += p.vy * (dt / 16.67); p.alpha -= p.decay * (dt / 16.67);
+                            if (p.alpha <= 0) particles.splice(i, 1);
+                        }
+                    }
+
+                    // Следование камеры за плавной головой локального игрока (60+ FPS)
+                    let headNode = null;
+                    if (isOfflineMode && otherPlayers['player']) {
+                        headNode = otherPlayers['player'].snake[0];
+                    } else if (!isOfflineMode && snake && snake.length > 0) {
+                        headNode = snake[0];
+                    }
+
+                    if (headNode) {
+                        let targetCamX = headNode.x - canvas.width / 2;
+                        let targetCamY = headNode.y - canvas.height / 2;
+                        camera.x += (targetCamX - camera.x) * 0.08;
+                        camera.y += (targetCamY - camera.y) * 0.08;
+                    }
+
+                    draw();
+                }
+                requestAnimationFrame(gameLoop);
+            }
+
             function updateLeaderboard() {
-                if (!isPlaying) return;
-                
                 let allPlayers = [];
                 if (isOfflineMode) {
                     allPlayers = Object.values(otherPlayers);
@@ -690,55 +830,19 @@
                 });
             }
 
-            // ИГРОВОЙ ЦИКЛ ОБНОВЛЕНИЯ И ОТРИСОВКИ
-            let lastTime = performance.now();
-            function gameLoop(timestamp) {
-                let dt = timestamp - lastTime;
-                if (dt > 100 || isNaN(dt)) dt = 16.67; 
-                lastTime = timestamp;
-
-                if (isPlaying) {
-                    if (isOfflineMode) {
-                        updateOfflineLogic(dt);
-                    } else {
-                        for (let i = particles.length - 1; i >= 0; i--) {
-                            let p = particles[i]; p.x += p.vx * (dt / 16.67); p.y += p.vy * (dt / 16.67); p.alpha -= p.decay * (dt / 16.67);
-                            if (p.alpha <= 0) particles.splice(i, 1);
-                        }
-                    }
-
-                    let headNode = null;
-                    if (isOfflineMode && otherPlayers['player']) {
-                        headNode = otherPlayers['player'].snake[0];
-                    } else if (!isOfflineMode && snake && snake.length > 0) {
-                        headNode = snake[0];
-                    }
-
-                    if (headNode) {
-                        let targetCamX = headNode.x - canvas.width / 2;
-                        let targetCamY = headNode.y - canvas.height / 2;
-                        camera.x += (targetCamX - camera.x) * 0.08;
-                        camera.y += (targetCamY - camera.y) * 0.08;
-                    }
-
-                    draw();
-                }
-                requestAnimationFrame(gameLoop);
-            }
-
             function draw() {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 ctx.save(); ctx.translate(-camera.x, -camera.y);
 
-                // Рендеринг кибер-сетки арены
+                // Кибер-сетка
                 ctx.strokeStyle = '#11161d'; ctx.lineWidth = 1;
                 for (let x = 0; x <= WORLD_SIZE; x += 60) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, WORLD_SIZE); ctx.stroke(); }
                 for (let y = 0; y <= WORLD_SIZE; y += 60) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WORLD_SIZE, y); ctx.stroke(); }
 
-                // Смертоносная неоновая граница
+                // Граница арены
                 ctx.strokeStyle = '#ff0055'; ctx.lineWidth = 5; ctx.strokeRect(0, 0, WORLD_SIZE, WORLD_SIZE);
 
-                // Отрендерить корм
+                // Рендеринг еды
                 foods.forEach(f => { ctx.beginPath(); ctx.arc(f.x, f.y, f.radius, 0, Math.PI * 2); ctx.fillStyle = f.color; ctx.fill(); });
 
                 // Рендеринг оппонентов/ботов
@@ -758,14 +862,14 @@
                     drawSnakeEntity(me.snake, me.skin, me.name, true, me.spawnProtection);
                 }
 
-                // Частицы/Взрывы
+                // Взрывы
                 particles.forEach(p => {
                     ctx.save(); ctx.globalAlpha = p.alpha; ctx.fillStyle = p.color;
                     ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.fill(); ctx.restore();
                 });
                 ctx.restore();
 
-                // [ИЗМЕНЕНО] РАДАР (МИНИКАРТА) С НОВОЙ ЛОГИКОЙ ЦВЕТОВ
+                // РАДАР (МИНИКАРТА) СНИЗУ СПРАВА — теперь тоже рендерится на 60+ FPS плавно
                 let radarSize = 130; let radarPadding = 25;
                 let radarX = canvas.width - radarSize - radarPadding;
                 let radarY = canvas.height - radarSize - radarPadding;
@@ -773,30 +877,18 @@
                 ctx.fillStyle = 'rgba(11, 12, 16, 0.85)'; ctx.strokeStyle = '#45a29e'; ctx.lineWidth = 2;
                 ctx.fillRect(radarX, radarY, radarSize, radarSize); ctx.strokeRect(radarX, radarY, radarSize, radarSize);
 
-                let currentId = isOfflineMode ? 'player' : (socket ? socket.id : null);
-
                 for (let id in otherPlayers) {
                     let op = otherPlayers[id];
+                    let skin = op.skin || SKINS[0];
+                    ctx.fillStyle = skin.head[1];
+                    let currentId = isOfflineMode ? 'player' : (socket ? socket.id : null);
                     ctx.beginPath(); 
-                    
-                    if (id === currentId) {
-                        // Я в оффлайн режиме (зеленая точка побольше)
-                        ctx.fillStyle = '#00ff00';
-                        ctx.arc(radarX + (op.x / WORLD_SIZE) * radarSize, radarY + (op.y / WORLD_SIZE) * radarSize, 4, 0, Math.PI * 2); 
-                    } else {
-                        // Все остальные игроки и боты (серые точки поменьше)
-                        ctx.fillStyle = '#888888';
-                        ctx.arc(radarX + (op.x / WORLD_SIZE) * radarSize, radarY + (op.y / WORLD_SIZE) * radarSize, 3, 0, Math.PI * 2); 
-                    }
+                    ctx.arc(radarX + (op.x / WORLD_SIZE) * radarSize, radarY + (op.y / WORLD_SIZE) * radarSize, (id === currentId)? 4 : 3, 0, Math.PI * 2); 
                     ctx.fill();
                 }
-                
-                // Я в онлайн режиме (зеленая точка поверх всего)
                 if(!isOfflineMode && snake.length > 0) {
-                    ctx.fillStyle = '#00ff00'; 
-                    ctx.beginPath();
-                    ctx.arc(radarX + (snake[0].x / WORLD_SIZE) * radarSize, radarY + (snake[0].y / WORLD_SIZE) * radarSize, 4, 0, Math.PI * 2); 
-                    ctx.fill();
+                    ctx.fillStyle = currentSkin.head[1]; ctx.beginPath();
+                    ctx.arc(radarX + (snake[0].x / WORLD_SIZE) * radarSize, radarY + (snake[0].y / WORLD_SIZE) * radarSize, 4, 0, Math.PI * 2); ctx.fill();
                 }
             }
 
@@ -846,12 +938,7 @@
                 }
             }
 
-            // Однократный запуск анимации отрисовки
             requestAnimationFrame(gameLoop);
-
-            // [НОВОЕ] Запуск таймера обновления лидерборда раз в 2 секунды (2000 миллисекунд)
-            setInterval(updateLeaderboard, 2000);
-            
         })();
     </script>
 </body>
