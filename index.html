@@ -158,7 +158,6 @@
         (function() {
             let socket = null;
             try {
-                // Подключаемся к вашему Render-серверу
                 socket = io("https://revert-io-server.onrender.com", { autoConnect: false });
             } catch(e) { console.log("Сетевой режим недоступен, готов локальный движок."); }
 
@@ -289,7 +288,7 @@
                             otherPlayers[id] = serverPlayers[id];
                         }
                     }
-                    updateLeaderboard();
+                    // [ИЗМЕНЕНО] Убрано мгновенное обновление лидерборда отсюда, чтобы снизить лаги DOM.
                 });
             }
 
@@ -487,6 +486,9 @@
                 isPlaying = true;
                 camera.x = otherPlayers['player'].x - canvas.width / 2;
                 camera.y = otherPlayers['player'].y - canvas.height / 2;
+                
+                // Сразу принудительно обновим лидерборд при старте
+                updateLeaderboard();
             }
 
             function createOfflineFood() {
@@ -585,13 +587,13 @@
                     }
                 }
 
-                // Локальные столкновения (Смерть об себя в оффлайне тоже отключена!)
+                // Локальные столкновения
                 let deadBots = [];
                 for (let idA in otherPlayers) {
                     let pA = otherPlayers[idA]; 
 
                     for (let idB in otherPlayers) {
-                        if (idA === idB) continue; // Отключена смерть об самого себя!
+                        if (idA === idB) continue; 
                         
                         let pB = otherPlayers[idB]; 
                         for (let j = 0; j < pB.snake.length; j++) {
@@ -628,7 +630,7 @@
                 });
 
                 if(otherPlayers['player']) massCounterUI.innerText = `MASS: ${otherPlayers['player'].score}`;
-                updateLeaderboard();
+                // [ИЗМЕНЕНО] Удален ежекадровый вызов updateLeaderboard(); для оффлайна
             }
 
             function updateSnakeSegments(p) {
@@ -663,45 +665,10 @@
                 }
             }
 
-            // ИГРОВОЙ ЦИКЛ ОБНОВЛЕНИЯ И ОТРИСОВКИ
-            let lastTime = performance.now();
-            function gameLoop(timestamp) {
-                let dt = timestamp - lastTime;
-                if (dt > 100 || isNaN(dt)) dt = 16.67; 
-                lastTime = timestamp;
-
-                if (isPlaying) {
-                    if (isOfflineMode) {
-                        updateOfflineLogic(dt);
-                    } else {
-                        // Рассчитываем затухание эффектов локально в онлайне
-                        for (let i = particles.length - 1; i >= 0; i--) {
-                            let p = particles[i]; p.x += p.vx * (dt / 16.67); p.y += p.vy * (dt / 16.67); p.alpha -= p.decay * (dt / 16.67);
-                            if (p.alpha <= 0) particles.splice(i, 1);
-                        }
-                    }
-
-                    // Следование камеры за головой игрока
-                    let headNode = null;
-                    if (isOfflineMode && otherPlayers['player']) {
-                        headNode = otherPlayers['player'].snake[0];
-                    } else if (!isOfflineMode && snake && snake.length > 0) {
-                        headNode = snake[0];
-                    }
-
-                    if (headNode) {
-                        let targetCamX = headNode.x - canvas.width / 2;
-                        let targetCamY = headNode.y - canvas.height / 2;
-                        camera.x += (targetCamX - camera.x) * 0.08;
-                        camera.y += (targetCamY - camera.y) * 0.08;
-                    }
-
-                    draw();
-                }
-                requestAnimationFrame(gameLoop);
-            }
-
+            // [ИЗМЕНЕНО] ФУНКЦИЯ ОБНОВЛЕНИЯ ЛИДЕРБОРДА (РАЗ В 2 СЕКУНДЫ)
             function updateLeaderboard() {
+                if (!isPlaying) return;
+                
                 let allPlayers = [];
                 if (isOfflineMode) {
                     allPlayers = Object.values(otherPlayers);
@@ -721,6 +688,42 @@
                     item.innerHTML = `<span>${index + 1}. ${p.name}</span><span>${p.score}</span>`;
                     leaderList.appendChild(item);
                 });
+            }
+
+            // ИГРОВОЙ ЦИКЛ ОБНОВЛЕНИЯ И ОТРИСОВКИ
+            let lastTime = performance.now();
+            function gameLoop(timestamp) {
+                let dt = timestamp - lastTime;
+                if (dt > 100 || isNaN(dt)) dt = 16.67; 
+                lastTime = timestamp;
+
+                if (isPlaying) {
+                    if (isOfflineMode) {
+                        updateOfflineLogic(dt);
+                    } else {
+                        for (let i = particles.length - 1; i >= 0; i--) {
+                            let p = particles[i]; p.x += p.vx * (dt / 16.67); p.y += p.vy * (dt / 16.67); p.alpha -= p.decay * (dt / 16.67);
+                            if (p.alpha <= 0) particles.splice(i, 1);
+                        }
+                    }
+
+                    let headNode = null;
+                    if (isOfflineMode && otherPlayers['player']) {
+                        headNode = otherPlayers['player'].snake[0];
+                    } else if (!isOfflineMode && snake && snake.length > 0) {
+                        headNode = snake[0];
+                    }
+
+                    if (headNode) {
+                        let targetCamX = headNode.x - canvas.width / 2;
+                        let targetCamY = headNode.y - canvas.height / 2;
+                        camera.x += (targetCamX - camera.x) * 0.08;
+                        camera.y += (targetCamY - camera.y) * 0.08;
+                    }
+
+                    draw();
+                }
+                requestAnimationFrame(gameLoop);
             }
 
             function draw() {
@@ -762,7 +765,7 @@
                 });
                 ctx.restore();
 
-                // РАДАР (МИНИКАРТА) СНИЗУ СПРАВА
+                // [ИЗМЕНЕНО] РАДАР (МИНИКАРТА) С НОВОЙ ЛОГИКОЙ ЦВЕТОВ
                 let radarSize = 130; let radarPadding = 25;
                 let radarX = canvas.width - radarSize - radarPadding;
                 let radarY = canvas.height - radarSize - radarPadding;
@@ -770,18 +773,30 @@
                 ctx.fillStyle = 'rgba(11, 12, 16, 0.85)'; ctx.strokeStyle = '#45a29e'; ctx.lineWidth = 2;
                 ctx.fillRect(radarX, radarY, radarSize, radarSize); ctx.strokeRect(radarX, radarY, radarSize, radarSize);
 
+                let currentId = isOfflineMode ? 'player' : (socket ? socket.id : null);
+
                 for (let id in otherPlayers) {
                     let op = otherPlayers[id];
-                    let skin = op.skin || SKINS[0];
-                    ctx.fillStyle = skin.head[1];
-                    let currentId = isOfflineMode ? 'player' : (socket ? socket.id : null);
                     ctx.beginPath(); 
-                    ctx.arc(radarX + (op.x / WORLD_SIZE) * radarSize, radarY + (op.y / WORLD_SIZE) * radarSize, (id === currentId)? 4 : 3, 0, Math.PI * 2); 
+                    
+                    if (id === currentId) {
+                        // Я в оффлайн режиме (зеленая точка побольше)
+                        ctx.fillStyle = '#00ff00';
+                        ctx.arc(radarX + (op.x / WORLD_SIZE) * radarSize, radarY + (op.y / WORLD_SIZE) * radarSize, 4, 0, Math.PI * 2); 
+                    } else {
+                        // Все остальные игроки и боты (серые точки поменьше)
+                        ctx.fillStyle = '#888888';
+                        ctx.arc(radarX + (op.x / WORLD_SIZE) * radarSize, radarY + (op.y / WORLD_SIZE) * radarSize, 3, 0, Math.PI * 2); 
+                    }
                     ctx.fill();
                 }
+                
+                // Я в онлайн режиме (зеленая точка поверх всего)
                 if(!isOfflineMode && snake.length > 0) {
-                    ctx.fillStyle = currentSkin.head[1]; ctx.beginPath();
-                    ctx.arc(radarX + (snake[0].x / WORLD_SIZE) * radarSize, radarY + (snake[0].y / WORLD_SIZE) * radarSize, 4, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#00ff00'; 
+                    ctx.beginPath();
+                    ctx.arc(radarX + (snake[0].x / WORLD_SIZE) * radarSize, radarY + (snake[0].y / WORLD_SIZE) * radarSize, 4, 0, Math.PI * 2); 
+                    ctx.fill();
                 }
             }
 
@@ -798,7 +813,7 @@
 
                     if (i === 0) {
                         gradient.addColorStop(0, s.head[0]); gradient.addColorStop(0.2, s.head[1]); gradient.addColorStop(1, s.head[2]);
-                        if (protTime > 0) ctx.globalAlpha = 0.4; // Эффект щита появления
+                        if (protTime > 0) ctx.globalAlpha = 0.4; 
                         else { ctx.shadowBlur = 15; ctx.shadowColor = s.head[1]; }
                     } else if (i === targetSnake.length - 1) {
                         gradient.addColorStop(0, s.tail[0]); gradient.addColorStop(0.2, s.tail[1]); gradient.addColorStop(1, s.tail[2]);
@@ -831,8 +846,12 @@
                 }
             }
 
-            // Однократный запуск анимации
+            // Однократный запуск анимации отрисовки
             requestAnimationFrame(gameLoop);
+
+            // [НОВОЕ] Запуск таймера обновления лидерборда раз в 2 секунды (2000 миллисекунд)
+            setInterval(updateLeaderboard, 2000);
+            
         })();
     </script>
 </body>
